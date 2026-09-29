@@ -24,6 +24,10 @@
       "outputs": ["coverage/**"]
     },
     "@marchepublic/db#build": { "outputs": [] },
-    "@marchepublic/workflow#build": { "outputs": [] }
+    "@marchepublic/workflow#build": { "outputs": [] },
+    "@marchepublic/web#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    }
   }
 }
