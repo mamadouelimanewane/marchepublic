@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
+    "dev": "tailwindcss -i src/app/globals.css -o src/app/tailwind.generated.css --config ../../tailwind.config.js && next dev --port 3000",
+    "build": "tailwindcss -i src/app/globals.css -o src/app/tailwind.generated.css --config ../../tailwind.config.js && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest --passWithNoTests"

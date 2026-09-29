@@ -11,3 +11,4 @@ coverage
 *.tsbuildinfo
 
 .vercel
+apps/web/src/app/tailwind.generated.css

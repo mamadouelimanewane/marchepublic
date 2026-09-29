@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import './globals.css'
+import './tailwind.generated.css'
 import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
