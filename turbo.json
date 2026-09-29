@@ -7,6 +7,10 @@
     "ENCRYPTION_KEY",
     "NODE_ENV"
   ],
+  "globalDependencies": [
+    "postcss.config.js",
+    "tailwind.config.js"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
