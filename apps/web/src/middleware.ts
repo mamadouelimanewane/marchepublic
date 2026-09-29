@@ -29,11 +29,36 @@ const ROLE_ROUTES: Record<string, string[]> = {
 
 export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers)
+  const pathname = request.nextUrl.pathname
+  const isPublic = PUBLIC_ROUTES.some(route =>
+    pathname === route || pathname.startsWith('/avis/') || pathname.startsWith('/auth/')
+  )
+
+  // Public pages and assets must remain available even if Supabase is not
+  // configured or temporarily unreachable in the deployment environment.
+  if (isPublic) {
+    return NextResponse.next({ request: { headers: requestHeaders } })
+  }
+
+  // Only protected application endpoints need a Supabase session check.
+  const isProtected = pathname.startsWith('/dashboard') || pathname.startsWith('/api/')
+  if (!isProtected) {
+    return NextResponse.next({ request: { headers: requestHeaders } })
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return pathname.startsWith('/api/')
+      ? NextResponse.json({ error: 'Authentification indisponible' }, { status: 503 })
+      : new NextResponse('Authentification momentanément indisponible', { status: 503 })
+  }
+
   let response = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase: any = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -53,21 +78,11 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Récupérer la session
-  const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
+  try {
+    // Récupérer la session
+    const { data: { user } } = await supabase.auth.getUser()
 
-  // 1. Routes publiques → pas de protection
-  const isPublic = PUBLIC_ROUTES.some(route =>
-    pathname === route || pathname.startsWith('/avis') || pathname.startsWith('/auth')
-  )
-
-  if (isPublic) {
-    return response
-  }
-
-  // 2. Routes dashboard → authentification requise
-  if (pathname.startsWith('/dashboard') || pathname.startsWith('/api')) {
+    // Routes dashboard → authentification requise
     if (!user) {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
@@ -109,6 +124,11 @@ export async function middleware(request: NextRequest) {
     const securedResponse = NextResponse.next({ request: { headers: requestHeaders } })
     response.cookies.getAll().forEach(cookie => securedResponse.cookies.set(cookie))
     response = securedResponse
+  } catch (error) {
+    console.error('Erreur de vérification de session Supabase dans le middleware:', error)
+    return pathname.startsWith('/api/')
+      ? NextResponse.json({ error: 'Service d’authentification indisponible' }, { status: 503 })
+      : new NextResponse('Service d’authentification momentanément indisponible', { status: 503 })
   }
 
   return response

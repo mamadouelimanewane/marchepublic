@@ -2,28 +2,27 @@ import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function HomePage() {
-  const supabase = await createSupabaseServerClient()
+  let totalAO = 12;
+  let totalInstitutions = 4;
 
-  let totalAO = 0;
-  let totalInstitutions = 0;
-
-  try {
-    const [resAO, resInst] = await Promise.all([
-      supabase
-        .from('tenders')
-        .select('*', { count: 'exact', head: true })
-        .gte('current_phase', 'PHASE_4_PUBLICATION'),
-      supabase
-        .from('institutions')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true),
-    ]);
-    totalAO = resAO.count ?? 0;
-    totalInstitutions = resInst.count ?? 0;
-  } catch (error) {
-    console.warn("Base de données injoignable (Docker manquant ?). Mode démo activé.");
-    totalAO = 12; // Valeurs factices pour la démo UI
-    totalInstitutions = 4;
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      const supabase = await createSupabaseServerClient()
+      const [resAO, resInst] = await Promise.all([
+        supabase
+          .from('tenders')
+          .select('*', { count: 'exact', head: true })
+          .gte('current_phase', 'PHASE_4_PUBLICATION'),
+        supabase
+          .from('institutions')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true),
+      ]);
+      totalAO = resAO.count ?? 0;
+      totalInstitutions = resInst.count ?? 0;
+    } catch {
+      console.warn('Base de données indisponible : affichage des statistiques de démonstration.')
+    }
   }
 
   return (
