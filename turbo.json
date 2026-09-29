@@ -30,6 +30,7 @@
     "@marchepublic/db#build": { "outputs": [] },
     "@marchepublic/workflow#build": { "outputs": [] },
     "@marchepublic/web#build": {
+      "cache": false,
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"]
     }
