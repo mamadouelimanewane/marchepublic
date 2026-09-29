@@ -57,6 +57,7 @@ export type TenderEvent =
   | { type: 'FINALISER_EVALUATION' }
   | { type: 'PRONONCER_ATTRIBUTION_PROVISOIRE'; attributaireId: string; montant: number }
   | { type: 'OUVRIR_PERIODE_RECOURS' }
+  | { type: 'SIGNALER_RECOURS_DEPOSE' }
   | { type: 'CLORE_PERIODE_RECOURS' }
   | { type: 'DECISION_ARCOP'; decision: 'REJETE' | 'IRRECEVABLE' | 'FAVORABLE'; note?: string }
   | { type: 'CONFIRMER_ATTRIBUTION_DEFINITIVE' }
@@ -80,7 +81,7 @@ export const tenderMachine = createMachine({
   context: ({ input }: { input: Partial<TenderContext> }) => ({
     tenderId: input.tenderId ?? '',
     institutionId: input.institutionId ?? '',
-    currentPhase: 'PHASE_1_PROGRAMMATION',
+    currentPhase: 'PHASE_1_PROGRAMMATION' as TenderPhase,
     montantEstime: input.montantEstime ?? 0,
     montantAvenantsCumule: 0,
     montantSoustraitCumule: 0,
@@ -155,6 +156,12 @@ export const tenderMachine = createMachine({
               currentPhase: 'PHASE_2_REDACTION',
               dcmpAvisReceived: false,
             }),
+          },
+          {
+            // Avis complémentaire → retour en rédaction pour correction
+            guard: ({ event }) => event.avis === 'COMPLEMENTAIRE',
+            target: 'PHASE_2_REDACTION',
+            actions: assign({ currentPhase: 'PHASE_2_REDACTION', dcmpAvisReceived: false }),
           },
         ],
       },
@@ -234,7 +241,7 @@ export const tenderMachine = createMachine({
       on: {
         DECLENCHER_OUVERTURE: {
           // GUARD : Requiert l'action de DEUX personnes (CPM + Président Commission)
-          guard: ({ event }) => Boolean(event.userId && event.presidentId),
+          guard: ({ event }) => Boolean(event.userId && event.presidentId && event.userId !== event.presidentId),
           target: 'PHASE_8_EVALUATION',
           actions: assign({
             currentPhase: 'PHASE_8_EVALUATION',
@@ -296,6 +303,9 @@ export const tenderMachine = createMachine({
         hardLock: true,
       },
       on: {
+        SIGNALER_RECOURS_DEPOSE: {
+          actions: assign({ hasAppealPending: true }),
+        },
         DECISION_ARCOP: [
           {
             // Recours rejeté ou irrecevable → Phase 11 débloquée

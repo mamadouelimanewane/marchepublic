@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import type { SetAllCookies } from '@supabase/ssr'
 
 // ==========================================
 // MIDDLEWARE RBAC — Plateforme Marchés Publics
@@ -27,9 +28,10 @@ const ROLE_ROUTES: Record<string, string[]> = {
 }
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request })
+  const requestHeaders = new Headers(request.headers)
+  let response = NextResponse.next({ request: { headers: requestHeaders } })
 
-  const supabase = createServerClient(
+  const supabase: any = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -37,15 +39,16 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet) {
+        setAll: ((cookiesToSet: Parameters<SetAllCookies>[0]) => {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
-          response = NextResponse.next({ request })
+          requestHeaders.set('cookie', request.cookies.toString())
+          response = NextResponse.next({ request: { headers: requestHeaders } })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
-        },
+        }) as SetAllCookies,
       },
     }
   )
@@ -66,6 +69,9 @@ export async function middleware(request: NextRequest) {
   // 2. Routes dashboard → authentification requise
   if (pathname.startsWith('/dashboard') || pathname.startsWith('/api')) {
     if (!user) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      }
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(loginUrl)
@@ -79,6 +85,9 @@ export async function middleware(request: NextRequest) {
       .single()
 
     if (!profile) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Profil utilisateur introuvable' }, { status: 403 })
+      }
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
@@ -91,12 +100,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard/403', request.url))
     }
 
-    // 5. Injection contexte multi-tenant dans les headers
-    // → Lu par Supabase Edge Functions pour appliquer les politiques RLS
-    response.headers.set('x-user-id', user.id)
-    response.headers.set('x-user-role', profile.role)
-    response.headers.set('x-institution-id', profile.institution_id ?? '')
-    response.headers.set('x-user-name', profile.full_name)
+    // Transmettre des valeurs calculées côté serveur aux Route Handlers.
+    // Les politiques SQL se basent sur auth.uid() et le profil en base, jamais sur ces headers.
+    requestHeaders.set('x-user-id', user.id)
+    requestHeaders.set('x-user-role', profile.role)
+    requestHeaders.set('x-institution-id', profile.institution_id ?? '')
+    requestHeaders.set('x-user-name', profile.full_name)
+    const securedResponse = NextResponse.next({ request: { headers: requestHeaders } })
+    response.cookies.getAll().forEach(cookie => securedResponse.cookies.set(cookie))
+    response = securedResponse
   }
 
   return response

@@ -3,16 +3,22 @@
 import { useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import CryptoJS from 'crypto-js'
 
 interface DepotOffreProps {
   tenderId: string
-  publicKey: string // Clé publique du marché pour chiffrement côté client
+  /** Clé publique RSA-OAEP au format Base64 SPKI. La clé privée doit rester hors de la plateforme. */
+  publicKey: string
+}
+
+function toBase64(value: ArrayBuffer) {
+  const bytes = new Uint8Array(value)
+  let binary = ''
+  bytes.forEach(byte => { binary += String.fromCharCode(byte) })
+  return btoa(binary)
 }
 
 export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreProps) {
   const [file, setFile] = useState<File | null>(null)
-  const [montant, setMontant] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [progress, setProgress] = useState(0)
   
@@ -20,29 +26,46 @@ export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreP
 
   const handleEncryptAndSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!file || !montant) return
+    if (!file) return
     
     setIsSubmitting(true)
     setProgress(10)
     
     try {
-      // 1. Lire le fichier
-      const arrayBuffer = await file.arrayBuffer()
-      const wordArray = CryptoJS.lib.WordArray.create(arrayBuffer as any)
-      
-      setProgress(30)
-      
-      // 2. Chiffrer le fichier avec AES-256 (Clé spécifique au marché)
-      const encryptedFile = CryptoJS.AES.encrypt(wordArray, publicKey).toString()
-      const encryptedBlob = new Blob([encryptedFile], { type: 'text/plain' })
-      
-      setProgress(50)
-      
-      // 3. Uploader le fichier chiffré vers Supabase Storage
-      const filePath = `${tenderId}/${Date.now()}_${file.name}.encrypted`
+      if (file.type !== 'application/pdf' || file.size > 20 * 1024 * 1024) {
+        throw new Error('Sélectionnez un PDF de 20 Mo maximum.')
+      }
+      if (!publicKey) throw new Error('La clé publique de dépôt de ce marché est manquante.')
+
+      // Envelope encryption: AES-GCM for the dossier, RSA-OAEP for its random AES key.
+      const rawPublicKey = Uint8Array.from(atob(publicKey), character => character.charCodeAt(0))
+      const rsaKey = await crypto.subtle.importKey(
+        'spki', rawPublicKey, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
+      )
+      const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt'])
+      const iv = crypto.getRandomValues(new Uint8Array(12))
+      const encryptedData = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, await file.arrayBuffer())
+      const wrappedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaKey, await crypto.subtle.exportKey('raw', aesKey))
+      const envelope = JSON.stringify({ version: 1, algorithm: 'RSA-OAEP-256+A256GCM', iv: toBase64(iv.buffer), wrappedKey: toBase64(wrappedKey), ciphertext: toBase64(encryptedData) })
+      const encryptedBlob = new Blob([envelope], { type: 'application/json' })
+      const digest = await crypto.subtle.digest('SHA-256', await encryptedBlob.arrayBuffer())
+      const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+      setProgress(55)
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) throw new Error('Reconnectez-vous avant de déposer une offre.')
+      const { data: tender, error: tenderError } = await supabase
+        .from('tenders').select('institution_id, current_phase, date_limite_depot').eq('id', tenderId).single()
+      if (tenderError || !tender) throw new Error('Marché introuvable ou inaccessible.')
+      if (tender.current_phase !== 'PHASE_6_DEPOT_OFFRES' || !tender.date_limite_depot || Date.now() >= new Date(tender.date_limite_depot).getTime()) {
+        throw new Error('La période de dépôt est fermée pour ce marché.')
+      }
+
+      // Le chemin ne contient aucun nom de fichier fourni par l'utilisateur.
+      const filePath = `${tenderId}/${user.id}/${crypto.randomUUID()}.envelope.json`
       const { error: uploadError } = await supabase.storage
         .from('bids')
-        .upload(filePath, encryptedBlob)
+        .upload(filePath, encryptedBlob, { contentType: 'application/json', upsert: false })
         
       if (uploadError) throw uploadError
       
@@ -53,14 +76,19 @@ export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreP
         .from('bids')
         .insert({
           tender_id: tenderId,
+          institution_id: tender.institution_id,
+          soumissionnaire_id: user.id,
           status: 'SOUMISE',
           fichier_financier_path: filePath,
           fichier_financier_encrypted: true,
-          submitted_at: new Date().toISOString()
-          // Le montant n'est PAS stocké en clair, il sera extrait du fichier financier déchiffré à l'ouverture
+          fichier_financier_hash: hash,
+          submitted_at: new Date().toISOString(),
         })
-        
-      if (dbError) throw dbError
+
+      if (dbError) {
+        await supabase.storage.from('bids').remove([filePath])
+        throw dbError
+      }
       
       setProgress(100)
       toast.success('Votre offre a été chiffrée et déposée avec succès dans le coffre-fort numérique.')
@@ -82,7 +110,7 @@ export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreP
         <div>
           <h2 className="text-lg font-bold text-gray-800">Coffre-fort Cryptographique</h2>
           <p className="text-sm text-gray-500">
-            Dépôt sécurisé AES-256 (Phase 6). Votre offre restera indéchiffrable jusqu'à la séance officielle d'ouverture.
+            Le PDF est chiffré dans votre navigateur avec une clé aléatoire AES-GCM. Cette clé est scellée avec la clé publique RSA du marché.
           </p>
         </div>
       </div>
@@ -102,19 +130,8 @@ export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreP
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Montant de l'offre financière (FCFA)
-          </label>
-          <input 
-            type="number" 
-            required
-            value={montant}
-            onChange={(e) => setMontant(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
-            placeholder="Ex: 15000000"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Ce montant sera chiffré dans la base de données.
+          <p className="text-sm text-gray-600">
+            Vérifiez que le PDF contient toutes les pièces administratives, techniques et financières requises.
           </p>
         </div>
 
@@ -136,7 +153,7 @@ export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreP
       <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
         <span>⚠</span>
         <p className="text-xs text-yellow-800 text-justify">
-          <strong>Avertissement Légal :</strong> Conformément au Décret 2022-2295, toute offre déposée après la date et l'heure limites sera automatiquement rejetée par le système. Le condensat (hash SHA-256) de votre fichier chiffré sera inscrit dans le journal d'audit immuable pour garantir son intégrité.
+          <strong>À savoir :</strong> Le condensat SHA-256 du dossier chiffré est conservé avec l'offre. La clé privée RSA permettant l'ouverture doit rester sous le contrôle indépendant de l'autorité compétente.
         </p>
       </div>
     </div>

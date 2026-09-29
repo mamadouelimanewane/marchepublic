@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export default async function HomePage() {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
 
   let totalAO = 0;
   let totalInstitutions = 0;

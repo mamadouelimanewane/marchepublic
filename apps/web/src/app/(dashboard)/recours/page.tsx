@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
 export default async function RecoursArcopPage() {
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   const { data: profile } = await supabase
@@ -78,7 +78,7 @@ export default async function RecoursArcopPage() {
                   <p className="text-sm text-gray-600 mb-3">{r.motif}</p>
                   
                   <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span><strong>Requérant :</strong> {/* @ts-ignore */}{r.users?.full_name} (NINEA: {/* @ts-ignore */}{r.users?.ninea})</span>
+                    <span><strong>Requérant :</strong> {r.users[0]?.full_name} (NINEA: {r.users[0]?.ninea})</span>
                     <span><strong>Déposé le :</strong> {format(new Date(r.date_depot), 'dd MMM yyyy', { locale: fr })}</span>
                   </div>
                 </div>

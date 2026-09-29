@@ -8,10 +8,11 @@ export const revalidate = 60  // Cache 1 minute - portail public
 export default async function AvisPage({
   searchParams,
 }: {
-  searchParams: { corps_metier?: string; mode?: string; q?: string; page?: string }
+  searchParams: Promise<{ corps_metier?: string; mode?: string; q?: string; page?: string }>
 }) {
-  const supabase = createSupabaseServerClient()
-  const page = parseInt(searchParams.page ?? '1')
+  const filters = await searchParams
+  const supabase = await createSupabaseServerClient()
+  const page = Math.max(1, Number.parseInt(filters.page ?? '1', 10) || 1)
   const pageSize = 20
   const offset = (page - 1) * pageSize
 
@@ -29,14 +30,15 @@ export default async function AvisPage({
     .range(offset, offset + pageSize - 1)
 
   // Filtres
-  if (searchParams.corps_metier) {
-    query = query.eq('corps_metier_id', searchParams.corps_metier)
+  if (filters.corps_metier) {
+    query = query.eq('corps_metier_id', filters.corps_metier)
   }
-  if (searchParams.mode) {
-    query = query.eq('mode_passation', searchParams.mode)
+  if (filters.mode) {
+    query = query.eq('mode_passation', filters.mode)
   }
-  if (searchParams.q) {
-    query = query.or(`title.ilike.%${searchParams.q}%,reference.ilike.%${searchParams.q}%`)
+  if (filters.q) {
+    const safeQuery = filters.q.replace(/[(),.%]/g, ' ').trim()
+    if (safeQuery) query = query.or(`title.ilike.%${safeQuery}%,reference.ilike.%${safeQuery}%`)
   }
 
   const { data: avis, count } = await query
@@ -68,11 +70,11 @@ export default async function AvisPage({
         <form className="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex flex-wrap gap-3">
           <input
             name="q"
-            defaultValue={searchParams.q}
+            defaultValue={filters.q}
             placeholder="Rechercher par titre ou référence..."
             className="flex-1 min-w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
-          <select name="mode" defaultValue={searchParams.mode} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <select name="mode" defaultValue={filters.mode} className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
             <option value="">Tous les modes</option>
             <option value="AOO">Appel d'Offres Ouvert (AOO)</option>
             <option value="AOR">Appel d'Offres Restreint (AOR)</option>

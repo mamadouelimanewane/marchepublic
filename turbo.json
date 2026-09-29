@@ -22,6 +22,8 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
-    }
+    },
+    "@marchepublic/db#build": { "outputs": [] },
+    "@marchepublic/workflow#build": { "outputs": [] }
   }
 }
