@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+  /* Couleurs institutionnelles Sénégal */
+  --sn-green: #009a44;
+  --sn-yellow: #fdef42;
+  --sn-red: #cc0001;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+}
+
+/* Workflow phases badges */
+.phase-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.phase-programmation { @apply bg-gray-100 text-gray-700; }
+.phase-redaction { @apply bg-blue-100 text-blue-700; }
+.phase-validation { @apply bg-orange-100 text-orange-700; }
+.phase-publication { @apply bg-green-100 text-green-700; }
+.phase-depot { @apply bg-purple-100 text-purple-700; }
+.phase-ouverture { @apply bg-red-100 text-red-700; }
+.phase-evaluation { @apply bg-indigo-100 text-indigo-700; }
+.phase-attribution { @apply bg-emerald-100 text-emerald-700; }
+.phase-recours { @apply bg-red-100 text-red-800; }
+.phase-signature { @apply bg-teal-100 text-teal-700; }
+.phase-execution { @apply bg-cyan-100 text-cyan-700; }
+.phase-reception { @apply bg-lime-100 text-lime-700; }
+.phase-cloture { @apply bg-slate-100 text-slate-700; }
+
+/* Hard Lock indicator */
+.hard-lock {
+  @apply border-2 border-red-500 bg-red-50;
+}
+
+/* Mode low-bandwidth : Désactiver les animations */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
