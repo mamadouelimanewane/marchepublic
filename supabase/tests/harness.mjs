@@ -54,3 +54,9 @@ export async function asService(db, fn) {
   await db.exec(`SET ROLE service_role; SELECT set_config('request.jwt.claim.role', 'service_role', false);`)
   try { return await fn() } finally { await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.role', '', false);`) }
 }
+
+/** Visiteur non connecté (rôle anon, aucun claim JWT). */
+export async function asAnon(db, fn) {
+  await db.exec(`SET ROLE anon; SELECT set_config('request.jwt.claim.sub', '', false); SELECT set_config('request.jwt.claim.role', 'anon', false);`)
+  try { return await fn() } finally { await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.role', '', false);`) }
+}

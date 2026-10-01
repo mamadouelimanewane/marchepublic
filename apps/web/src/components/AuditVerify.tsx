@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { verifyAuditChain } from '@/app/dashboard/actions/execution'
+import { verifyAuditIntegrity } from '@/app/dashboard/actions/controle'
 
 /** Recalcule la chaîne de hachage du journal d'audit côté base et signale toute altération. */
 export function AuditVerify({ institutionId, institutions }: { institutionId: string | null; institutions: { id: string; name: string }[] }) {
@@ -10,7 +10,7 @@ export function AuditVerify({ institutionId, institutions }: { institutionId: st
   const [target, setTarget] = useState<string>(institutionId ?? '')
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const run = () => start(async () => {
-    const res = await verifyAuditChain(target || null)
+    const res = await verifyAuditIntegrity(target || null)
     setResult(res)
     if (res.ok) toast.success(res.message); else toast.error(res.message)
   })
@@ -23,7 +23,7 @@ export function AuditVerify({ institutionId, institutions }: { institutionId: st
         </select>
       )}
       <button type="button" onClick={run} disabled={pending} className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50">
-        {pending ? 'Vérification…' : 'Vérifier l\'intégrité de la chaîne'}
+        {pending ? 'Vérification…' : 'Vérifier l\'intégrité (chaîne et empreintes publiées)'}
       </button>
       {result && <span role="status" className={result.ok ? 'text-sm text-green-700' : 'text-sm font-semibold text-red-700'}>{result.message}</span>}
     </div>

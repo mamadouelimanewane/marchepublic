@@ -58,6 +58,8 @@ export const ROUTE_ACCESS: Record<string, readonly Role[]> = {
   '/dashboard/archivage': ['CPM', 'PRM', 'ADMIN', 'DCMP', 'ARCOP', 'COUR_COMPTES'],
   '/dashboard/reporting': ['PRM', 'CPM', 'DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN'],
   '/dashboard/audit': ['DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN', 'PRM', 'CPM'],
+  '/dashboard/risques': ['DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN', 'PRM'],
+  '/dashboard/signalements': ['DCMP', 'ARCOP', 'COUR_COMPTES'],
 }
 
 export function canAccessRoute(role: Role, pathname: string): boolean {
@@ -105,6 +107,8 @@ const NAV: { section: string; items: (NavItem & { roles?: readonly Role[] })[] }
     section: 'Contrôle',
     items: [
       { href: '/dashboard/reporting', label: 'Reporting & statistiques' },
+      { href: '/dashboard/risques', label: 'Alertes de risque' },
+      { href: '/dashboard/signalements', label: 'Signalements citoyens' },
       { href: '/dashboard/audit', label: 'Journal d\'audit' },
     ],
   },

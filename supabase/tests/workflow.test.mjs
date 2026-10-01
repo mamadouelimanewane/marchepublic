@@ -463,7 +463,7 @@ describe('Étanchéité : ce qu’un candidat étranger au marché peut lire', (
       if (ALLOWED.has(t) || t === 'users') continue
       let rows
       try { rows = await rpc('outsider', `select count(*)::int n from ${t}`) } catch { continue }   // permission refusée = étanche
-      if (rows[0].n > 0 && !['v_stats_publiques', 'v_avis_publics'].includes(t)) leaks.push(`${t}: ${rows[0].n}`)
+      if (rows[0].n > 0 && !['v_stats_publiques', 'v_avis_publics', 'v_audit_anchors'].includes(t) && !t.startsWith('v_public_')) leaks.push(`${t}: ${rows[0].n}`)
     }
     assert.deepEqual(leaks, [])
     const self = await rpc('outsider', 'select id from users')

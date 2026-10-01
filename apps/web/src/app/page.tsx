@@ -34,6 +34,12 @@ export default async function HomePage() {
             <Link href="/avis" className="text-green-100 hover:text-white text-sm">
               Avis d'AO
             </Link>
+            <Link href="/transparence" className="text-green-100 hover:text-white text-sm">
+              Transparence
+            </Link>
+            <Link href="/signalement" className="text-green-100 hover:text-white text-sm">
+              Signaler
+            </Link>
             <Link href="/login"
               className="bg-yellow-400 text-green-900 px-4 py-2 rounded-md text-sm font-semibold hover:bg-yellow-300 transition-colors">
               Connexion

@@ -85,3 +85,15 @@ Limites de l'allotissement : un recours suspend l'ensemble du marché (pas de re
 |---|---|---|---|
 | Clé d'ouverture sans point de défaillance unique | ✅ | Partage de Shamir k parmi n, reconstitution locale dans le navigateur | `apps/web/src/lib/shamir.test.ts` |
 | Génération de PDF (TDR/DAO, PV d'ouverture et de réception, rapport d'évaluation, décision d'attribution, contrat) | ✅ | `/api/pdf/[kind]/[id]` (pdf-lib), lectures sous RLS, pied de page avec empreinte SHA-256 du contenu | `apps/web/src/lib/pdf.test.ts` (validité et pagination ; mise en page non inspectée visuellement) |
+
+## Transparence et intégrité (au-delà du cahier des charges)
+
+| Fonctionnalité | État | Mise en œuvre | Test |
+|---|---|---|---|
+| Publication OCDS 1.1 | ✅ | `ocds_release`, `ocds_release_package`, `/api/ocds/*` ; préfixe d'ocid à remplacer par le préfixe officiel (paramètre `OCDS_PREFIX`) | `transparence.test.mjs` (validation contre le schéma officiel 1.1.5) |
+| Portail public à publicité graduée | ✅ | Vues `v_public_*` (définisseur), pages `/transparence` | idem |
+| Alertes de risque + examens immuables | ✅ (règles fixes, seuils paramétrables `RF_*`) ; ⛔ apprentissage automatique (exige un volume réel de données) | `v_red_flags`, `v_risk_scores`, `review_red_flag` | idem |
+| Signalements citoyens | ✅ | `submit_citizen_report` (anonyme, débit limité), suivi par code, traitement par les régulateurs | idem |
+| Ancrage du journal d'audit | ✅ publication quotidienne ; ⛔ horodatage externe qualifié (RFC 3161) | `anchor_audit_chain`, `verify_audit_anchors`, `v_audit_anchors` | idem (attaque par réécriture complète) |
+
+Positionnement : la plateforme nationale APPEL (ARCOP, octobre 2025) existe ; ces fonctions font de cette application une couche de contrôle, de transparence et d'inclusion interopérable via OCDS.

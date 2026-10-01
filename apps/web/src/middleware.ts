@@ -11,7 +11,8 @@ import { canAccessRoute, isRole } from '@marchepublic/workflow/src/roles'
 // ==========================================
 
 const PUBLIC_EXACT = new Set(['/', '/avis', '/login', '/register'])
-const PUBLIC_PREFIXES = ['/avis/', '/auth/']
+// Portail de transparence, signalements citoyens et données ouvertes : publics par conception.
+const PUBLIC_PREFIXES = ['/avis/', '/auth/', '/transparence', '/signalement', '/api/ocds/', '/api/audit/anchors', '/api/cron/']
 const SPOOFABLE_HEADERS = ['x-user-id', 'x-user-role', 'x-institution-id', 'x-user-name']
 
 function isPublic(pathname: string) {
