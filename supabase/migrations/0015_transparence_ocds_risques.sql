@@ -35,7 +35,7 @@ $$;
 -- Publicité graduée (cohérente avec le principe « chacun voit tout » une fois la procédure jugée) :
 --   phase ≥ 5 : avis, calendrier, lots ; phase ≥ 10 : candidats, montants, attributaires ; phase ≥ 12 : contrat, avenants, paiements.
 CREATE OR REPLACE FUNCTION ocds_release(p_tender UUID)
-RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 DECLARE
   v_t tenders%ROWTYPE; v_i institutions%ROWTYPE; v_ocid TEXT; v_pub BOOLEAN; v_status TEXT;
   v_parties JSONB := '[]'; v_tenderers JSONB := '[]'; v_awards JSONB := '[]'; v_contracts JSONB := '[]'; v_lots JSONB := '[]';
@@ -135,7 +135,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION ocds_release_package(p_uri TEXT, p_limit INTEGER DEFAULT 100, p_after TIMESTAMPTZ DEFAULT NULL)
-RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS JSONB LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 DECLARE v_releases JSONB;
 BEGIN
   SELECT COALESCE(jsonb_agg(ocds_release(x.id) ORDER BY x.updated_at), '[]') INTO v_releases
@@ -260,7 +260,7 @@ CREATE TRIGGER trig_audit_red_flag_reviews AFTER INSERT ON red_flag_reviews FOR 
 
 -- Les régulateurs qualifient ; l'autorité contractante (PRM) ne peut qu'apporter son explication.
 CREATE OR REPLACE FUNCTION review_red_flag(p_tender UUID, p_flag TEXT, p_statut TEXT, p_note TEXT)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_role TEXT := current_user_role(); v_inst UUID; v_id UUID;
 BEGIN
   SELECT institution_id INTO v_inst FROM tenders WHERE id = p_tender;
@@ -305,7 +305,7 @@ CREATE TRIGGER trig_audit_citizen_reports AFTER INSERT OR UPDATE ON citizen_repo
 
 -- Dépôt anonyme possible ; débit limité par la base (par marché et global) pour éviter le noyage par du bruit.
 CREATE OR REPLACE FUNCTION submit_citizen_report(p_tender UUID, p_reference TEXT, p_categorie TEXT, p_description TEXT, p_contact TEXT DEFAULT NULL)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_code TEXT; v_tender UUID := p_tender;
 BEGIN
   IF p_tender IS NULL AND COALESCE(p_reference, '') <> '' THEN
@@ -325,13 +325,13 @@ END $$;
 
 -- Le déclarant suit l'état de son signalement avec son code (aucune autre donnée n'est restituée).
 CREATE OR REPLACE FUNCTION citizen_report_status(p_code TEXT)
-RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
   SELECT jsonb_build_object('statut', statut, 'recu_le', created_at, 'mis_a_jour_le', updated_at) FROM citizen_reports WHERE code_suivi = upper(trim(p_code))
 $$;
 GRANT EXECUTE ON FUNCTION submit_citizen_report(UUID, TEXT, TEXT, TEXT, TEXT), citizen_report_status(TEXT) TO anon, authenticated;
 
 CREATE OR REPLACE FUNCTION handle_citizen_report(p_report UUID, p_statut TEXT, p_note TEXT DEFAULT NULL)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   IF current_user_role() NOT IN ('DCMP', 'ARCOP', 'COUR_COMPTES') THEN RAISE EXCEPTION 'FORBIDDEN: réservé aux régulateurs'; END IF;
   IF p_statut NOT IN ('EN_EXAMEN', 'TRANSMIS', 'CLOS_SANS_SUITE') THEN RAISE EXCEPTION 'INVALID_STATE'; END IF;
@@ -361,7 +361,7 @@ CREATE POLICY "audit_anchors_read" ON audit_anchors FOR SELECT USING (true);
 REVOKE INSERT, UPDATE, DELETE ON audit_anchors FROM anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION anchor_audit_chain()
-RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE r RECORD; n INTEGER := 0;
 BEGIN
   FOR r IN SELECT DISTINCT ON (institution_id) institution_id, seq, row_hash FROM audit_logs ORDER BY institution_id, seq DESC LOOP
@@ -379,7 +379,7 @@ GRANT EXECUTE ON FUNCTION anchor_audit_chain() TO service_role;
 -- Vérifie que la chaîne actuelle est toujours compatible avec chaque empreinte déjà publiée.
 CREATE OR REPLACE FUNCTION verify_audit_anchors()
 RETURNS TABLE (anchor_id UUID, institution_id UUID, head_seq BIGINT, reason TEXT)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   IF current_user_role() NOT IN ('DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN') AND auth.role() <> 'service_role' THEN
     RAISE EXCEPTION 'FORBIDDEN: vérification réservée aux régulateurs';

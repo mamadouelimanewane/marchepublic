@@ -30,7 +30,7 @@ CREATE TRIGGER trig_audit_ai_requests AFTER INSERT ON ai_requests FOR EACH ROW E
 
 -- Réserve une requête : contrôle des droits, du verrouillage du document et du quota. Renvoie l'identifiant à clôturer.
 CREATE OR REPLACE FUNCTION claim_ai_request(p_document UUID, p_kind TEXT, p_model TEXT, p_input_chars INTEGER)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE d tender_documents%ROWTYPE; v_phase tender_phase; v_used INTEGER; v_quota INTEGER := config_num('AI_QUOTA_JOUR', 30)::int; v_id UUID;
 BEGIN
   IF current_user_role() NOT IN ('SERVICE_DEMANDEUR', 'CPM', 'PRM') THEN RAISE EXCEPTION 'FORBIDDEN: assistant réservé au personnel de rédaction'; END IF;
@@ -48,13 +48,13 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION finish_ai_request(p_id UUID, p_ok BOOLEAN, p_output_chars INTEGER DEFAULT NULL)
-RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
   UPDATE ai_requests SET statut = CASE WHEN p_ok THEN 'OK' ELSE 'ERREUR' END, output_chars = p_output_chars
   WHERE id = p_id AND user_id = auth.uid() AND statut = 'EN_COURS'
 $$;
 -- Les requêtes en erreur ne consomment pas de quota (elles restent tracées).
 CREATE OR REPLACE FUNCTION ai_quota_remaining()
-RETURNS INTEGER LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS INTEGER LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
   SELECT GREATEST(config_num('AI_QUOTA_JOUR', 30)::int - count(*)::int, 0) FROM ai_requests WHERE user_id = auth.uid() AND statut <> 'ERREUR' AND created_at > NOW() - interval '24 hours'
 $$;
 REVOKE ALL ON FUNCTION claim_ai_request(UUID, TEXT, TEXT, INTEGER), finish_ai_request(UUID, BOOLEAN, INTEGER), ai_quota_remaining() FROM PUBLIC, anon;

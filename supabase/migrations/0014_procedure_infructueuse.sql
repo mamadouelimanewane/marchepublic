@@ -5,7 +5,7 @@
 -- ==========================================
 
 CREATE OR REPLACE FUNCTION _declare_infructueux(p_tender UUID, p_payload JSONB)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; r RECORD;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender FOR UPDATE;
@@ -25,7 +25,7 @@ REVOKE ALL ON FUNCTION _declare_infructueux(UUID, JSONB) FROM PUBLIC, anon, auth
 
 -- Relance : nouveau marché en phase 1 reprenant le besoin (un seul par marché infructueux).
 CREATE OR REPLACE FUNCTION relancer_marche(p_tender UUID)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_id UUID;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender FOR UPDATE;

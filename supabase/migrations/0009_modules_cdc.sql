@@ -9,12 +9,12 @@
 -- Fonctions d'aide aux politiques RLS (SECURITY DEFINER : évitent la récursion de politiques)
 -- ------------------------------------------
 CREATE OR REPLACE FUNCTION tender_phase_of(p_tender UUID)
-RETURNS tender_phase LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS tender_phase LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
   SELECT current_phase FROM tenders WHERE id = p_tender
 $$;
 
 CREATE OR REPLACE FUNCTION tender_institution_of(p_tender UUID)
-RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
   SELECT institution_id FROM tenders WHERE id = p_tender
 $$;
 
@@ -26,7 +26,7 @@ RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION is_commission_member(p_tender UUID, p_roles TEXT[] DEFAULT NULL)
-RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM commission_members cm
@@ -540,7 +540,7 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Lecture : personnel de l'AC, régulateurs, et titulaire du contrat concerné
 CREATE OR REPLACE FUNCTION is_contract_holder(p_contract UUID)
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
   SELECT EXISTS (SELECT 1 FROM contracts c WHERE c.id = p_contract AND c.attributaire_id = auth.uid())
 $$;
 
@@ -649,7 +649,7 @@ CREATE TRIGGER trig_receptions_immutable BEFORE UPDATE OR DELETE ON receptions F
 
 -- Avancement : met à jour le taux du marché
 CREATE OR REPLACE FUNCTION progress_reports_apply()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   UPDATE tenders SET taux_avancement = GREATEST(taux_avancement, NEW.taux_avancement) WHERE id = NEW.tender_id;
   RETURN NEW;

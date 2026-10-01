@@ -75,7 +75,7 @@ CREATE TRIGGER trig_bids_guard BEFORE UPDATE ON bids FOR EACH ROW EXECUTE FUNCTI
 -- Les soumissionnaires peuvent voir les profils dont ils ont besoin ; le personnel voit les candidats
 -- d'un marché de son institution après l'ouverture des plis.
 CREATE OR REPLACE FUNCTION bidder_visible_to_staff(p_user UUID)
-RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 BEGIN
   -- Les évaluateurs notent des offres anonymisées : l'identité des candidats est réservée au CPM/PRM (et aux régulateurs).
   RETURN current_user_role() IN ('CPM', 'PRM') AND EXISTS (
@@ -88,7 +88,7 @@ CREATE POLICY "users_bidders_after_opening" ON users FOR SELECT USING (role = 'S
 -- Dépôt : horodatage et contrôles côté serveur ; accusé de réception ; offres tardives tracées.
 CREATE OR REPLACE FUNCTION submit_bid(p_tender UUID, p_technique_path TEXT, p_technique_hash TEXT,
                                       p_financier_path TEXT, p_financier_hash TEXT, p_lot UUID DEFAULT NULL)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_t tenders%ROWTYPE; v_u users%ROWTYPE; v_now TIMESTAMPTZ := clock_timestamp();
   v_prefix TEXT; v_bid UUID; v_receipt TEXT; v_existing bids%ROWTYPE;
@@ -191,7 +191,7 @@ CREATE POLICY "opening_signatures_select" ON opening_signatures FOR SELECT USING
 CREATE TRIGGER trig_audit_opening_signatures AFTER INSERT ON opening_signatures FOR EACH ROW EXECUTE FUNCTION audit_row_change();
 
 CREATE OR REPLACE FUNCTION sign_opening(p_tender UUID, p_observations TEXT DEFAULT NULL)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_t tenders%ROWTYPE; v_role TEXT := current_user_role(); v_signer TEXT;
   v_cpm UUID; v_pres UUID; v_nb INTEGER;
@@ -309,7 +309,7 @@ CREATE TRIGGER trig_bid_evaluations_guard BEFORE INSERT OR UPDATE ON bid_evaluat
   FOR EACH ROW EXECUTE FUNCTION bid_evaluations_guard();
 
 CREATE OR REPLACE FUNCTION _finalize_evaluation(p_tender UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_t tenders%ROWTYPE; v_seuil NUMERIC; v_w NUMERIC; v_min BIGINT; r RECORD; g RECORD; v_rang INTEGER := 0; v_n INTEGER;
 BEGIN
@@ -371,7 +371,7 @@ END $$;
 REVOKE ALL ON FUNCTION _finalize_evaluation(UUID) FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION _award_one(p_tender UUID, p_lot UUID, p_bid UUID, p_just TEXT, p_round INTEGER)
-RETURNS BIGINT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS BIGINT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_rank bid_rankings%ROWTYPE; v_first UUID; v_bid UUID; v_u users%ROWTYPE;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender;
@@ -402,7 +402,7 @@ REVOKE ALL ON FUNCTION _award_one(UUID, UUID, UUID, TEXT, INTEGER) FROM PUBLIC, 
 -- Marché non alloti : payload {bid_id, justification}. Marché alloti : payload {awards:[{lot_id, bid_id?, justification?}]} ;
 -- tout lot classé non mentionné est attribué à son rang 1.
 CREATE OR REPLACE FUNCTION _set_provisional_award(p_tender UUID, p_payload JSONB)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_total BIGINT := 0; l RECORD; a JSONB;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender FOR UPDATE;
@@ -429,7 +429,7 @@ REVOKE INSERT, UPDATE, DELETE ON appeals FROM anon, authenticated;
 CREATE UNIQUE INDEX uq_appeal_one_pending ON appeals (tender_id, requerant_id) WHERE status IN ('DEPOSE', 'EN_INSTRUCTION');
 
 CREATE OR REPLACE FUNCTION sync_appeal_status()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_pending BOOLEAN; v_last TEXT;
 BEGIN
   SELECT EXISTS (SELECT 1 FROM appeals WHERE tender_id = NEW.tender_id AND status IN ('DEPOSE', 'EN_INSTRUCTION')) INTO v_pending;
@@ -442,7 +442,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION submit_appeal(p_tender UUID, p_motif TEXT, p_description TEXT DEFAULT NULL, p_document_path TEXT DEFAULT NULL)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_bid bids%ROWTYPE; v_id UUID; r RECORD;
 BEGIN
   IF current_user_role() <> 'SOUMISSIONNAIRE' THEN RAISE EXCEPTION 'FORBIDDEN: réservé aux candidats'; END IF;
@@ -477,7 +477,7 @@ END $$;
 GRANT EXECUTE ON FUNCTION submit_appeal(UUID, TEXT, TEXT, TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION decide_appeal(p_appeal UUID, p_decision TEXT, p_motivation TEXT DEFAULT NULL)
-RETURNS appeal_status LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS appeal_status LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_a appeals%ROWTYPE; v_t tenders%ROWTYPE; r RECORD;
 BEGIN
   IF current_user_role() <> 'ARCOP' THEN RAISE EXCEPTION 'FORBIDDEN: réservé à l''ARCOP'; END IF;
@@ -523,7 +523,7 @@ ALTER TABLE contracts ADD CONSTRAINT contracts_montant_positive CHECK (montant_i
 REVOKE INSERT, UPDATE, DELETE ON contracts FROM anon, authenticated;
 
 CREATE OR REPLACE FUNCTION prepare_contract(p_tender UUID, p_date_debut DATE DEFAULT NULL, p_delai_jours INTEGER DEFAULT NULL, p_lot UUID DEFAULT NULL)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_l tender_lots%ROWTYPE; v_id UUID; v_bid UUID; v_holder UUID; v_montant BIGINT;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender FOR UPDATE;
@@ -549,7 +549,7 @@ END $$;
 GRANT EXECUTE ON FUNCTION prepare_contract(UUID, DATE, INTEGER, UUID) TO authenticated;
 
 CREATE OR REPLACE FUNCTION sign_contract(p_contract UUID)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_c contracts%ROWTYPE; v_t tenders%ROWTYPE; v_party TEXT;
 BEGIN
   SELECT * INTO v_c FROM contracts WHERE id = p_contract FOR UPDATE;
@@ -571,7 +571,7 @@ END $$;
 GRANT EXECUTE ON FUNCTION sign_contract(UUID) TO authenticated;
 
 CREATE OR REPLACE FUNCTION visa_contract(p_contract UUID)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_c contracts%ROWTYPE;
 BEGIN
   SELECT * INTO v_c FROM contracts WHERE id = p_contract FOR UPDATE;
@@ -584,7 +584,7 @@ GRANT EXECUTE ON FUNCTION visa_contract(UUID) TO authenticated;
 
 -- Avenants (plafond 30 %) — le dépassement est BLOQUÉ par la base
 CREATE OR REPLACE FUNCTION check_amendment_limit()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_c contracts%ROWTYPE; v_plafond NUMERIC; v_cumul BIGINT; v_net BIGINT;
 BEGIN
   SELECT * INTO v_c FROM contracts WHERE id = NEW.contract_id FOR UPDATE;
@@ -615,7 +615,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION check_subcontractor_limit()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_c contracts%ROWTYPE; v_plafond NUMERIC; v_total BIGINT;
 BEGIN
   SELECT * INTO v_c FROM contracts WHERE id = NEW.contract_id FOR UPDATE;
@@ -640,7 +640,7 @@ END $$;
 -- Trace d'une tentative bloquée (la ligne d'audit ne peut pas être écrite dans la transaction annulée).
 -- La base revérifie elle-même le dépassement avant d'écrire : impossible de polluer le journal à volonté.
 CREATE OR REPLACE FUNCTION record_blocked_attempt(p_kind TEXT, p_contract UUID, p_montant BIGINT)
-RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_c contracts%ROWTYPE; v_cumul BIGINT; v_plafond NUMERIC;
 BEGIN
   SELECT * INTO v_c FROM contracts WHERE id = p_contract;
@@ -691,7 +691,7 @@ CREATE POLICY "pme_entries_select" ON pme_quota_entries FOR SELECT USING (is_ins
 CREATE POLICY "pme_quotas_select" ON pme_quotas_tracking FOR SELECT USING (is_inst_staff(institution_id) OR is_regulateur() OR current_user_role() = 'COUR_COMPTES');
 
 CREATE OR REPLACE FUNCTION record_pme_quota()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_u users%ROWTYPE; v_year INTEGER; v_total BIGINT; v_pme BIGINT; v_fem BIGINT; l RECORD;
 BEGIN
   IF NEW.current_phase = 'PHASE_11_ATTRIBUTION_DEFINITIVE' AND OLD.current_phase <> 'PHASE_11_ATTRIBUTION_DEFINITIVE'
@@ -734,7 +734,7 @@ INSERT INTO config_seuils (cle, valeur, description) VALUES
 ON CONFLICT (cle) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION archive_tender(p_tender UUID)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_manifest JSONB; v_id UUID; v_head TEXT;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender;

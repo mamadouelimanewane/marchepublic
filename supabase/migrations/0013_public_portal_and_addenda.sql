@@ -21,7 +21,7 @@ CREATE POLICY "corps_metiers_read" ON corps_metiers FOR SELECT USING (true);
 
 -- Additif au DAO : publié immédiatement (verrouillé), horodaté, notifié à tous les candidats ayant retiré le dossier.
 CREATE OR REPLACE FUNCTION publish_addendum(p_tender UUID, p_titre TEXT, p_contenu TEXT)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_id UUID; r RECORD;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender FOR UPDATE;

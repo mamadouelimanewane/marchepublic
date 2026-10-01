@@ -64,7 +64,7 @@ CREATE POLICY "supplier_files_read" ON storage.objects FOR SELECT TO authenticat
 
 -- Vérification par l'administration (ADMIN ou DCMP) : toute décision de refus est motivée.
 CREATE OR REPLACE FUNCTION review_supplier_document(p_doc UUID, p_statut TEXT, p_motif TEXT DEFAULT NULL)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_d supplier_documents%ROWTYPE;
 BEGIN
   IF current_user_role() NOT IN ('ADMIN', 'DCMP') THEN RAISE EXCEPTION 'FORBIDDEN: vérification réservée à l''administration'; END IF;
@@ -83,7 +83,7 @@ GRANT EXECUTE ON FUNCTION review_supplier_document(UUID, TEXT, TEXT) TO authenti
 -- Accessible au titulaire, au personnel qui peut voir ce candidat (après ouverture), aux régulateurs et à l'administration.
 CREATE OR REPLACE FUNCTION supplier_pieces(p_user UUID, p_at DATE DEFAULT CURRENT_DATE)
 RETURNS TABLE (type TEXT, situation TEXT, date_expiration DATE, doc_id UUID)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 #variable_conflict use_variable
 DECLARE v_type TEXT;
 BEGIN
@@ -145,7 +145,7 @@ CREATE POLICY "alert_subs_owner" ON tender_alert_subscriptions FOR ALL
   WITH CHECK (user_id = auth.uid() AND current_user_role() = 'SOUMISSIONNAIRE');
 
 CREATE OR REPLACE FUNCTION alert_subs_limit()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   IF (SELECT COUNT(*) FROM tender_alert_subscriptions WHERE user_id = NEW.user_id) >= 10 THEN
     RAISE EXCEPTION 'LIMIT_REACHED: 10 alertes maximum par compte';
@@ -156,7 +156,7 @@ CREATE TRIGGER trig_alert_subs_limit BEFORE INSERT ON tender_alert_subscriptions
 
 -- Appelée à la publication d'un avis : une notification par candidat concerné, un message par abonnement.
 CREATE OR REPLACE FUNCTION enqueue_tender_alerts(p_tender UUID)
-RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE t tenders%ROWTYPE; v_url TEXT; v_n INTEGER := 0; s RECORD;
 BEGIN
   SELECT * INTO t FROM tenders WHERE id = p_tender;
@@ -190,7 +190,7 @@ REVOKE ALL ON FUNCTION enqueue_tender_alerts(UUID) FROM PUBLIC, anon, authentica
 
 -- Worker (service_role) : récupère un lot de messages d'un ou plusieurs canaux, sans conflit entre exécutions parallèles.
 CREATE OR REPLACE FUNCTION claim_outbox(p_canaux TEXT[], p_limit INTEGER DEFAULT 50)
-RETURNS SETOF outbox_messages LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS SETOF outbox_messages LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   RETURN QUERY
   WITH picked AS (
@@ -200,7 +200,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION mark_outbox(p_id UUID, p_ok BOOLEAN, p_erreur TEXT DEFAULT NULL)
-RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
   UPDATE outbox_messages SET
     statut = CASE WHEN p_ok THEN 'SENT' WHEN tentatives >= 3 THEN 'FAILED' ELSE 'PENDING' END,
     derniere_erreur = CASE WHEN p_ok THEN NULL ELSE left(p_erreur, 500) END,
@@ -212,7 +212,7 @@ GRANT EXECUTE ON FUNCTION claim_outbox(TEXT[], INTEGER), mark_outbox(UUID, BOOLE
 
 -- Alertes d'expiration des pièces (tâche quotidienne) : une seule alerte par pièce.
 CREATE OR REPLACE FUNCTION notify_expiring_documents()
-RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS INTEGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE d RECORD; n INTEGER := 0;
 BEGIN
   FOR d IN SELECT sd.id, sd.user_id, sd.titre, sd.date_expiration, u.email FROM supplier_documents sd JOIN users u ON u.id = sd.user_id

@@ -34,12 +34,12 @@ ALTER TABLE framework_agreements ENABLE ROW LEVEL SECURITY;
 
 -- Le titulaire d'un accord est un attributaire d'un contrat du marché source.
 CREATE OR REPLACE FUNCTION is_agreement_supplier(p_agreement UUID, p_user UUID DEFAULT auth.uid())
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
   SELECT EXISTS (SELECT 1 FROM framework_agreements a JOIN contracts c ON c.tender_id = a.tender_id WHERE a.id = p_agreement AND c.attributaire_id = p_user)
 $$;
 
 CREATE OR REPLACE FUNCTION can_order_from(p_agreement UUID)
-RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
   SELECT current_user_role() IN ('SERVICE_DEMANDEUR', 'CPM', 'PRM') AND EXISTS (
     SELECT 1 FROM framework_agreements a WHERE a.id = p_agreement
       AND (a.institution_id = current_institution_id() OR current_institution_id() = ANY (COALESCE(a.beneficiaires, ARRAY[]::uuid[]))))
@@ -51,7 +51,7 @@ REVOKE INSERT, UPDATE, DELETE ON framework_agreements FROM anon, authenticated;
 CREATE TRIGGER trig_audit_framework_agreements AFTER INSERT OR UPDATE ON framework_agreements FOR EACH ROW EXECUTE FUNCTION audit_row_change();
 
 CREATE OR REPLACE FUNCTION create_framework_agreement(p_tender UUID, p_titre TEXT, p_debut DATE, p_fin DATE, p_plafond BIGINT, p_beneficiaires UUID[] DEFAULT NULL)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_t tenders%ROWTYPE; v_sum BIGINT; v_id UUID;
 BEGIN
   SELECT * INTO v_t FROM tenders WHERE id = p_tender FOR UPDATE;
@@ -159,7 +159,7 @@ CREATE POLICY "catalog_items_update" ON catalog_items FOR UPDATE USING (supplier
 REVOKE DELETE ON catalog_items FROM anon, authenticated;
 
 CREATE OR REPLACE FUNCTION catalog_items_guard()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_a framework_agreements%ROWTYPE; v_cap NUMERIC := config_num('CATALOGUE_HAUSSE_MAX_PCT', 10);
 BEGIN
   SELECT * INTO v_a FROM framework_agreements WHERE id = NEW.agreement_id;
@@ -181,7 +181,7 @@ BEGIN
 END $$;
 CREATE TRIGGER trig_catalog_items_guard BEFORE INSERT OR UPDATE ON catalog_items FOR EACH ROW EXECUTE FUNCTION catalog_items_guard();
 CREATE OR REPLACE FUNCTION catalog_items_first_price()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   INSERT INTO catalog_price_history (item_id, ancien_prix, nouveau_prix, changed_by) VALUES (NEW.id, NULL, NEW.prix_unitaire, auth.uid());
   RETURN NEW;
@@ -216,7 +216,7 @@ REVOKE INSERT, UPDATE, DELETE ON call_off_orders FROM anon, authenticated;
 CREATE TRIGGER trig_audit_call_off AFTER INSERT OR UPDATE ON call_off_orders FOR EACH ROW EXECUTE FUNCTION audit_row_change();
 
 CREATE OR REPLACE FUNCTION place_call_off(p_item UUID, p_quantite NUMERIC)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_i catalog_items%ROWTYPE; v_a framework_agreements%ROWTYPE; v_montant BIGINT; v_id UUID;
 BEGIN
   SELECT * INTO v_i FROM catalog_items WHERE id = p_item;
@@ -238,7 +238,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION progress_call_off(p_order UUID, p_action TEXT, p_motif TEXT DEFAULT NULL)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE o call_off_orders%ROWTYPE; v_role TEXT := current_user_role();
 BEGIN
   SELECT * INTO o FROM call_off_orders WHERE id = p_order FOR UPDATE;

@@ -25,12 +25,12 @@ RETURNS TEXT[] LANGUAGE sql IMMUTABLE AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION config_num(p_cle TEXT, p_default NUMERIC DEFAULT NULL)
-RETURNS NUMERIC LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS NUMERIC LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
   SELECT COALESCE((SELECT valeur::numeric FROM config_seuils WHERE cle = p_cle), p_default)
 $$;
 
 CREATE OR REPLACE FUNCTION notify_user(p_user UUID, p_tender UUID, p_kind TEXT, p_titre TEXT, p_message TEXT DEFAULT NULL)
-RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE sql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
   INSERT INTO notifications (user_id, tender_id, kind, titre, message) VALUES (p_user, p_tender, p_kind, p_titre, p_message)
 $$;
 REVOKE ALL ON FUNCTION notify_user(UUID, UUID, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
@@ -47,7 +47,7 @@ COMMENT ON COLUMN institutions.seuil_travaux IS 'Dérogation de seuil AOO travau
 COMMENT ON COLUMN institutions.seuil_fournitures IS 'Dérogation de seuil AOO fournitures/services (FCFA) ; NULL = seuil réglementaire de config_seuils';
 
 CREATE OR REPLACE FUNCTION seuil_aoo(p_institution UUID, p_nature nature_marche)
-RETURNS BIGINT LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS BIGINT LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_inst institutions%ROWTYPE; v_scope TEXT; v_seuil BIGINT;
 BEGIN
   SELECT * INTO v_inst FROM institutions WHERE id = p_institution;
@@ -352,13 +352,13 @@ REVOKE INSERT, UPDATE, DELETE ON tenders FROM anon;
 -- RLS tenders (remplace 0005)
 -- ------------------------------------------
 CREATE OR REPLACE FUNCTION has_bid_on(p_tender UUID)
-RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 BEGIN
   RETURN EXISTS (SELECT 1 FROM bids b WHERE b.tender_id = p_tender AND b.soumissionnaire_id = auth.uid());
 END $$;
 
 CREATE OR REPLACE FUNCTION bidder_can_see_tender(p_tender UUID)
-RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS BOOLEAN LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 BEGIN
   RETURN current_user_role() = 'SOUMISSIONNAIRE' AND (
     EXISTS (SELECT 1 FROM tenders t WHERE t.id = p_tender
@@ -399,7 +399,7 @@ GRANT SELECT ON v_avis_publics TO anon, authenticated;
 -- Transition interne (effets de bord) — jamais exposée au client
 -- ------------------------------------------
 CREATE OR REPLACE FUNCTION _apply_transition(p_tender UUID, p_to tender_phase, p_event TEXT, p_payload JSONB DEFAULT '{}')
-RETURNS tender_phase LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS tender_phase LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_t tenders%ROWTYPE;
   r RECORD;
@@ -466,7 +466,7 @@ REVOKE ALL ON FUNCTION _apply_transition(UUID, tender_phase, TEXT, JSONB) FROM P
 -- RPC advance_phase : transitions pilotées par l'autorité contractante
 -- ------------------------------------------
 CREATE OR REPLACE FUNCTION advance_phase(p_tender UUID, p_event TEXT, p_payload JSONB DEFAULT '{}')
-RETURNS tender_phase LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS tender_phase LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_t tenders%ROWTYPE;
   v_role TEXT := current_user_role();
@@ -498,7 +498,7 @@ GRANT EXECUTE ON FUNCTION advance_phase(UUID, TEXT, JSONB) TO authenticated;
 -- ------------------------------------------
 CREATE OR REPLACE FUNCTION record_review(p_tender UUID, p_type TEXT, p_decision TEXT,
                                          p_motivation TEXT DEFAULT NULL, p_document_path TEXT DEFAULT NULL)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_t tenders%ROWTYPE; v_role TEXT := current_user_role(); v_id UUID;
   v_dcmp_ok BOOLEAN; v_bailleur_ok BOOLEAN;
@@ -548,7 +548,7 @@ GRANT EXECUTE ON FUNCTION record_review(UUID, TEXT, TEXT, TEXT, TEXT) TO authent
 -- RPC programmer_besoin : le PRM valide un besoin → création du marché en Phase 1 (PPM)
 -- ------------------------------------------
 CREATE OR REPLACE FUNCTION programmer_besoin(p_besoin UUID, p_decision TEXT, p_motif TEXT DEFAULT NULL)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_b besoins%ROWTYPE; v_tender UUID;
 BEGIN
   SELECT * INTO v_b FROM besoins WHERE id = p_besoin FOR UPDATE;
@@ -652,7 +652,7 @@ CREATE TRIGGER trig_tender_documents_guard BEFORE INSERT OR UPDATE OR DELETE ON 
 
 -- Chaque modification de contenu ou de statut de circuit crée une version immuable.
 CREATE OR REPLACE FUNCTION tender_documents_version()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.contenu IS DISTINCT FROM OLD.contenu OR NEW.circuit_statut IS DISTINCT FROM OLD.circuit_statut THEN
     INSERT INTO document_versions (document_id, tender_id, institution_id, version, contenu, content_hash, circuit_statut, author_id)

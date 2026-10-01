@@ -26,7 +26,7 @@ UPDATE document_templates SET sections = (
 
 -- 2. Contrôle des bloquants (miroir de `lintDocument` côté application, codes BLOQUANT)
 CREATE OR REPLACE FUNCTION document_blocking_issues(p_tender UUID, p_type TEXT, p_contenu JSONB)
-RETURNS TEXT[] LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+RETURNS TEXT[] LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 DECLARE
   v_sections JSONB := COALESCE(p_contenu->'sections', '[]'::jsonb);
   v_nature nature_marche := (SELECT nature_marche FROM tenders WHERE id = p_tender);

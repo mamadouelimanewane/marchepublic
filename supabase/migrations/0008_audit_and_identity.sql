@@ -43,7 +43,7 @@ ALTER TABLE users ALTER COLUMN is_pme_feminine SET NOT NULL;
 -- Création automatique du profil : TOUJOURS soumissionnaire. Les comptes institutionnels sont
 -- créés par l'administrateur (service_role), jamais depuis des métadonnées fournies par le client.
 CREATE OR REPLACE FUNCTION handle_new_auth_user()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   INSERT INTO public.users (id, role, full_name, email)
   VALUES (NEW.id, 'SOUMISSIONNAIRE',
@@ -137,9 +137,9 @@ $$;
 CREATE OR REPLACE FUNCTION write_audit(
   p_action TEXT, p_entity_type TEXT, p_entity_id UUID, p_institution UUID,
   p_old JSONB DEFAULT NULL, p_new JSONB DEFAULT NULL, p_metadata JSONB DEFAULT NULL)
-RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
-  v_id UUID := uuid_generate_v4();
+  v_id UUID := gen_random_uuid();
   v_prev TEXT;
   v_at TIMESTAMPTZ := clock_timestamp();
   v_user UUID := auth.uid();
@@ -162,7 +162,7 @@ GRANT EXECUTE ON FUNCTION write_audit(TEXT, TEXT, UUID, UUID, JSONB, JSONB, JSON
 -- Vérification d'intégrité de la chaîne (DCMP / ARCOP / Cour des Comptes).
 CREATE OR REPLACE FUNCTION verify_audit_chain(p_institution UUID DEFAULT NULL)
 RETURNS TABLE (broken_id UUID, occurred_at TIMESTAMPTZ, reason TEXT)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE r RECORD; v_prev TEXT := NULL;
 BEGIN
   IF current_user_role() NOT IN ('DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN') AND auth.role() <> 'service_role' THEN
@@ -183,7 +183,7 @@ GRANT EXECUTE ON FUNCTION verify_audit_chain(UUID) TO authenticated, service_rol
 
 -- Trigger générique d'audit des modifications de lignes.
 CREATE OR REPLACE FUNCTION audit_row_change()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
   v_row JSONB; v_old JSONB; v_new JSONB; v_inst UUID; v_id UUID;
 BEGIN
@@ -224,7 +224,7 @@ ALTER TABLE tender_counters ENABLE ROW LEVEL SECURITY;   -- aucune policy : acc�
 REVOKE ALL ON tender_counters FROM anon, authenticated;
 
 CREATE OR REPLACE FUNCTION next_tender_reference(p_institution UUID)
-RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TEXT LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_year INTEGER := EXTRACT(YEAR FROM NOW())::int; v_n INTEGER; v_code TEXT;
 BEGIN
   INSERT INTO tender_counters (institution_id, annee, dernier) VALUES (p_institution, v_year, 1)
@@ -237,7 +237,7 @@ REVOKE ALL ON FUNCTION next_tender_reference(UUID) FROM PUBLIC, anon, authentica
 
 -- La référence est toujours attribuée par le serveur : toute valeur fournie par le client est écrasée.
 CREATE OR REPLACE FUNCTION tenders_set_reference()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     NEW.reference := next_tender_reference(NEW.institution_id);

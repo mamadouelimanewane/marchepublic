@@ -10,7 +10,7 @@ ALTER TABLE provider_evaluations ADD COLUMN IF NOT EXISTS reponse_le TIMESTAMPTZ
 
 -- Le prestataire évalué lit sa propre évaluation (politique 0009) et peut y répondre une seule fois.
 CREATE OR REPLACE FUNCTION respond_to_evaluation(p_eval UUID, p_reponse TEXT)
-RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_e provider_evaluations%ROWTYPE;
 BEGIN
   SELECT * INTO v_e FROM provider_evaluations WHERE id = p_eval FOR UPDATE;
@@ -41,7 +41,7 @@ REVOKE UPDATE, DELETE ON provider_evaluations FROM anon, authenticated;
 CREATE OR REPLACE FUNCTION supplier_track_record(p_user UUID)
 RETURNS TABLE (nb_contrats INTEGER, nb_evaluations INTEGER, note_qualite NUMERIC, note_delai NUMERIC, note_cout NUMERIC, note_globale NUMERIC,
                montant_total BIGINT, taux_avenants_moyen NUMERIC, nb_incidents_critiques INTEGER)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp SET row_security = off AS $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp SET row_security = off AS $$
 BEGIN
   IF NOT (p_user = auth.uid() OR bidder_visible_to_staff(p_user) OR is_regulateur() OR current_user_role() IN ('COUR_COMPTES', 'ADMIN')) THEN
     RAISE EXCEPTION 'FORBIDDEN';

@@ -26,6 +26,11 @@ GRANT USAGE ON SCHEMA auth, storage TO anon, authenticated, service_role;
 export async function createDb({ upTo } = {}) {
   const db = new PGlite({ extensions: { uuid_ossp, pgcrypto } })
   await db.exec(SUPABASE_STUBS)
+  // Comme sur Supabase : les extensions vivent dans le schéma `extensions`, présent dans le search_path par défaut des sessions
+  // mais ABSENT du search_path restreint des fonctions SECURITY DEFINER (qui doivent donc l'inclure explicitement).
+  await db.exec(`CREATE SCHEMA extensions; GRANT USAGE ON SCHEMA extensions TO anon, authenticated, service_role;
+    CREATE EXTENSION "uuid-ossp" WITH SCHEMA extensions; CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+    SET search_path = "$user", public, extensions;`)
   // Miroir des privilèges par défaut de Supabase : les tables/fonctions créées ensuite sont accessibles aux 3 rôles API
   // (les REVOKE des migrations doivent donc être explicites, exactement comme en production).
   await db.exec(`
