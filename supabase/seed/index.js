@@ -20,7 +20,7 @@ if (!isLocal && !process.argv.includes('--force')) {
 }
 
 const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
-const PASSWORD = 'Demo-Passw0rd!'
+const PASSWORD = process.env.SEED_PASSWORD || 'Demo-Passw0rd!'   // SEED_PASSWORD : mot de passe unique choisi, à ne jamais écrire dans le code
 
 const USERS = [
   { email: 'admin@demo.sn', full_name: 'Administrateur Plateforme', role: 'ADMIN', inst: 'MEFP' },
@@ -90,7 +90,7 @@ async function main() {
     }), 'marché')
   }
 
-  console.log('✅ Terminé. Connexion : <compte>@demo.sn / ' + PASSWORD)
+  console.log('✅ Terminé. Connexion : <compte>@demo.sn / ' + (process.env.SEED_PASSWORD ? '(mot de passe SEED_PASSWORD)' : PASSWORD))
   console.log('   Comptes : ' + USERS.map(u => u.email).join(', '))
 }
 
