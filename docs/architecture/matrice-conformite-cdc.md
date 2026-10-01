@@ -106,3 +106,4 @@ Positionnement : la plateforme nationale APPEL (ARCOP, octobre 2025) existe ; ce
 | Alertes d'appels d'offres | ✅ file d'envoi, ciblage, éligibilité ; 🟡 envoi réel non vérifié (SMTP/opérateurs non disponibles ici) | `tender_alert_subscriptions`, `outbox_messages`, `/api/cron/maintenance` | `inclusion.test.mjs` |
 | Vérification automatique NINEA/RCCM/quitus auprès de la DGID | ⛔ | Les pièces sont vérifiées manuellement ; le connecteur DGID exige un accès |  |
 | Mode faible débit / hors ligne | 🟡 service worker limité aux pages publiques ; non éprouvé sur appareil | `public/sw.js`, `/hors-ligne` |  |
+| Historique de performance des prestataires | ✅ | `respond_to_evaluation`, `supplier_track_record`, `v_public_prestataires` (agrégat ≥ 3), évaluations immuables | `inclusion.test.mjs` |

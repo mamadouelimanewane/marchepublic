@@ -93,3 +93,13 @@ export async function toggleAlertSubscription(id: string, actif: boolean): Promi
     return ok(actif ? 'Alerte réactivée' : 'Alerte suspendue')
   })
 }
+
+/** Droit de réponse du prestataire évalué (une seule réponse, conservée avec l'évaluation). */
+export async function respondToEvaluation(evalId: string, fd: FormData): Promise<ActionResult> {
+  return guarded(async () => {
+    const v = parse(z.object({ reponse: z.string().trim().min(20, 'Réponse : 20 caractères minimum').max(2000) }), fd)
+    await rpc('respond_to_evaluation', { p_eval: evalId, p_reponse: v.reponse })
+    refresh()
+    return ok('Réponse enregistrée : elle sera conservée avec l\'évaluation')
+  })
+}

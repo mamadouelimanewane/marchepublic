@@ -2,12 +2,13 @@
 import test, { before } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { createDb, asUser, asService } from './harness.mjs'
+import { createDb, asUser, asService, asAnon } from './harness.mjs'
 
 let db, INST
 const U = {}
 const q = (sql, params) => db.query(sql, params).then(r => r.rows)
 const rpc = (key, sql, params) => asUser(db, U[key], () => q(sql, params))
+const anon = (sql, params) => asAnon(db, () => q(sql, params))
 const hex = c => c.repeat(64)
 
 async function mkUser(key, role, inst, flags = {}) {
@@ -139,4 +140,37 @@ test('alerte d’expiration des pièces : une seule fois par pièce', async () =
   assert.equal((await asService(db, () => q('select notify_expiring_documents() as n')))[0].n, 0, 'idempotent')
   assert.equal((await rpc('grande', `select * from notifications where kind='PIECE_EXPIRE'`)).length, 1)
   assert.equal((await q(`select * from outbox_messages where user_id=$1 and sujet like 'Pièce%'`, [U.grande])).length, 1)
+})
+
+test('historique des prestataires : droit de réponse, évaluations immuables, publication en agrégat à partir de 3', async () => {
+  // Trois contrats évalués pour le même prestataire (fixtures posées par le propriétaire de la base)
+  const evals = []
+  for (let i = 0; i < 3; i++) {
+    const t = (await q(`insert into tenders (institution_id, title, nature_marche, montant_estime, ligne_budgetaire, ppm_annee, mode_passation, current_phase)
+                        values ($1,$2,'FOURNITURES',1000000,'1',2026,'DRP','PHASE_14_RECEPTION_PAIEMENT') returning id`, [INST, `Marché historique ${i} pour essai`]))[0].id
+    const bid = (await q(`insert into bids (tender_id, institution_id, soumissionnaire_id, status) values ($1,$2,$3,'RETENUE_DEFINITIVE') returning id`, [t, INST, U.pme]))[0].id
+    const c = (await q(`insert into contracts (tender_id, institution_id, bid_id, attributaire_id, montant_initial) values ($1,$2,$3,$4,1000000) returning id`, [t, INST, bid, U.pme]))[0].id
+    evals.push((await q(`insert into provider_evaluations (contract_id, tender_id, institution_id, prestataire_id, note_qualite, note_delai, note_cout, commentaire)
+                         values ($1,$2,$3,$4,8,6,7,'Commentaire interne confidentiel') returning id`, [c, t, INST, U.pme]))[0].id)
+    if (i === 0) await q(`insert into execution_incidents (contract_id, tender_id, institution_id, gravite, description) values ($1,$2,$3,'CRITIQUE','Incident critique de test')`, [c, t, INST])
+  }
+  assert.equal((await anon('select * from v_public_prestataires')).length, 1)
+  const [pub] = await anon('select * from v_public_prestataires')
+  assert.equal(Number(pub.note_moyenne), 7); assert.equal(pub.nb_evaluations, 3)
+  assert.ok(!('commentaire' in pub), 'aucun commentaire individuel publié')
+
+  await assert.rejects(rpc('cpm', 'select respond_to_evaluation($1,$2)', [evals[0], 'Je réponds à la place du prestataire évalué']), /FORBIDDEN/)
+  await assert.rejects(rpc('pme', 'select respond_to_evaluation($1,$2)', [evals[0], 'trop court']), /INVALID_INPUT/)
+  await rpc('pme', 'select respond_to_evaluation($1,$2)', [evals[0], 'Le retard est imputable à une livraison tardive du maître d’ouvrage.'])
+  await assert.rejects(rpc('pme', 'select respond_to_evaluation($1,$2)', [evals[0], 'Seconde réponse qui ne doit pas être acceptée']), /INVALID_STATE/)
+  await assert.rejects(q(`update provider_evaluations set note_qualite = 10`), /IMMUTABLE_RECORD|permission/)
+  await assert.rejects(rpc('cpm', `update provider_evaluations set note_qualite = 10`), /permission denied/)
+  await assert.rejects(q(`delete from provider_evaluations`), /IMMUTABLE_RECORD/)
+
+  const [rec] = await rpc('pme', 'select * from supplier_track_record($1)', [U.pme])
+  assert.equal(rec.nb_contrats, 3); assert.equal(rec.nb_evaluations, 3); assert.equal(Number(rec.note_globale), 7); assert.equal(rec.nb_incidents_critiques, 1)
+  assert.equal(Number(rec.montant_total), 3000000)
+  await assert.rejects(rpc('autre', 'select * from supplier_track_record($1)', [U.pme]), /FORBIDDEN/)
+  await rpc('dcmp', 'select * from supplier_track_record($1)', [U.pme])
+  assert.equal((await rpc('autre', 'select * from provider_evaluations')).length, 0, 'les évaluations restent confidentielles')
 })

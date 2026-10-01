@@ -15,6 +15,7 @@ export function PublicShell({ title, subtitle, children, wide }: { title: string
             <Link href="/" className="text-green-200 hover:text-white">Accueil</Link>
             <Link href="/avis" className="text-green-200 hover:text-white">Avis d'appel d'offres</Link>
             <Link href="/transparence" className="text-green-200 hover:text-white">Transparence</Link>
+            <Link href="/transparence/prestataires" className="text-green-200 hover:text-white">Prestataires</Link>
             <Link href="/signalement" className="text-green-200 hover:text-white">Signaler</Link>
             <Link href="/login" className="font-semibold text-yellow-300 hover:text-yellow-200">Connexion</Link>
           </nav>

@@ -39,7 +39,7 @@ Comptes de démonstration : `prm@demo.sn`, `cpm@demo.sn`, `demandeur@demo.sn`, `
 ```bash
 npm test            # unitaires (workflow, validateurs) + intégration SQL
 npm run test:unit   # vitest — 52 tests (règles métier, chiffrement des offres, partage de clé, génération de PDF)
-npm run test:db     # 51 tests sur les migrations réelles : cycle des 15 phases, verrous, RLS, étanchéité, audit, OCDS, risques, inclusion, contrat code ↔ schéma
+npm run test:db     # 52 tests sur les migrations réelles : cycle des 15 phases, verrous, RLS, étanchéité, audit, OCDS, risques, inclusion, contrat code ↔ schéma
 ```
 
 Le test `supabase/tests/contract.test.mjs` analyse le code web et échoue si une table, une colonne ou une RPC utilisée n'existe pas dans le schéma.
@@ -57,6 +57,8 @@ La parité TypeScript ↔ SQL des transitions est vérifiée par `packages/workf
 - **Dossier permanent du fournisseur** (`/dashboard/mes-documents`) : quitus fiscal, RCCM, CNSS… déposés une fois, vérifiés par l'administration, jugés **à la date limite de dépôt** ; alerte avant expiration ; visibles du personnel d'une autorité seulement après l'ouverture des plis.
 - **Alertes d'appels d'offres** (`/dashboard/mes-alertes`) par secteur, nature et montant, par e-mail, SMS ou WhatsApp, via une file d'envoi. Les marchés réservés PME/ESS ne sont signalés qu'aux fournisseurs éligibles. L'envoi réel dépend d'un fournisseur configuré (`SMTP_URL`, webhooks SMS/WhatsApp) : sans configuration, les messages restent en attente.
 - **Faible débit** : application installable (PWA) avec accès hors ligne aux seules pages publiques (jamais aux pages connectées), reprise automatique du téléversement des pièces.
+
+- **Historique des prestataires** : évaluation de fin de marché immuable, droit de réponse du prestataire (une réponse), historique consultable par l'autorité qui évalue ses offres, publication **en moyenne seulement, à partir de 3 évaluations** (`/transparence/prestataires`).
 
 ## Règles métier bloquantes (vérifiées par les tests)
 

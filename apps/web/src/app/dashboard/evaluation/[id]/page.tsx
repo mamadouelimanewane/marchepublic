@@ -37,10 +37,13 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
   // Pièces administratives du dossier permanent, jugées à la date limite de dépôt (et non à la date du jour).
   const deadline = t.date_limite_depot ? String(t.date_limite_depot).slice(0, 10) : undefined
   const piecesByBid = new Map<string, { type: string; situation: string }[]>()
+  const recordByBid = new Map<string, Record<string, number | null>>()
   if (isStaff && n >= 7) {
     await Promise.all(bids.map(async b => {
       const { data } = await supabase.rpc('supplier_pieces', { p_user: b.soumissionnaire_id, p_at: deadline })
       piecesByBid.set(b.id, (data ?? []) as { type: string; situation: string }[])
+      const rec = await supabase.rpc('supplier_track_record', { p_user: b.soumissionnaire_id })
+      if (rec.data?.[0]) recordByBid.set(b.id, rec.data[0])
     }))
   }
   const me = (members.data ?? []).find(m => m.user_id === session.id)
@@ -91,7 +94,7 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
         <Card title="2. Conformité administrative et montants" subtitle="Retard automatiquement rejeté et tracé. Saisissez le montant relevé dans l'offre financière." padded={false}>
           <DataTable rows={bids} rowKey={b => b.id} empty="Aucune offre reçue."
             columns={[
-              { header: 'Candidat', cell: (b: any) => <span><strong>{showIdentities ? b.users?.full_name ?? '—' : alias(bids.indexOf(b))}</strong>{b.lots && <Badge tone="blue" className="ml-2">Lot {b.lots.numero_lot}</Badge>}{isStaff && piecesByBid.has(b.id) && (() => { const ps = piecesByBid.get(b.id)!; const bad = ps.filter(p => p.situation !== 'VALIDE'); return <><br /><span className={bad.length ? 'text-xs text-red-700' : 'text-xs text-green-700'} title={bad.map(p => `${p.type}: ${p.situation}`).join(' · ')}>Pièces : {ps.length - bad.length}/{ps.length} valides{bad.length ? ` (${bad.map(p => p.type).join(', ')})` : ''}</span></> })()}{showIdentities && b.users?.is_pme && <Badge tone="amber" className="ml-2">PME</Badge>}<br /><span className="text-xs text-gray-400">Déposée le {dateFr(b.submitted_at, true)}</span></span> },
+              { header: 'Candidat', cell: (b: any) => <span><strong>{showIdentities ? b.users?.full_name ?? '—' : alias(bids.indexOf(b))}</strong>{b.lots && <Badge tone="blue" className="ml-2">Lot {b.lots.numero_lot}</Badge>}{isStaff && piecesByBid.has(b.id) && (() => { const ps = piecesByBid.get(b.id)!; const bad = ps.filter(p => p.situation !== 'VALIDE'); return <><br /><span className={bad.length ? 'text-xs text-red-700' : 'text-xs text-green-700'} title={bad.map(p => `${p.type}: ${p.situation}`).join(' · ')}>Pièces : {ps.length - bad.length}/{ps.length} valides{bad.length ? ` (${bad.map(p => p.type).join(', ')})` : ''}</span>{recordByBid.get(b.id) && <><br /><span className="text-xs text-gray-500">Historique : {recordByBid.get(b.id)!.nb_contrats} contrat(s), note {recordByBid.get(b.id)!.note_globale ?? '—'}/10, {recordByBid.get(b.id)!.nb_incidents_critiques} incident(s) critique(s)</span></>}</> })()}{showIdentities && b.users?.is_pme && <Badge tone="amber" className="ml-2">PME</Badge>}<br /><span className="text-xs text-gray-400">Déposée le {dateFr(b.submitted_at, true)}</span></span> },
               { header: 'Statut', cell: (b: any) => <Badge tone={b.status === 'CONFORME' || b.status === 'EVALUEE' ? 'green' : ['RETARDEE', 'NON_CONFORME', 'REJETEE'].includes(b.status) ? 'red' : 'blue'}>{b.status}</Badge> },
               { header: 'Montant', cell: (b: any) => fcfa(b.montant_offre) },
               { header: 'Contrôle', cell: (b: any) => isStaff && ['SOUMISE', 'CONFORME', 'NON_CONFORME'].includes(b.status) && ['PHASE_7_OUVERTURE_PLIS', 'PHASE_8_EVALUATION'].includes(t.current_phase) ? (
