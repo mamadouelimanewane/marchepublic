@@ -111,6 +111,7 @@ export const sectionsSchema = z.array(z.object({
   titre: texte('Titre de section', 1, 200),
   contenu: z.string().max(100_000),
   obligatoire: z.boolean().optional(),
+  consigne: z.string().max(5_000).optional(),
 }))
 
 export const reviewSchema = z.object({

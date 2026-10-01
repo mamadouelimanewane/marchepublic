@@ -108,3 +108,4 @@ Positionnement : la plateforme nationale APPEL (ARCOP, octobre 2025) existe ; ce
 | Mode faible débit / hors ligne | 🟡 service worker limité aux pages publiques ; non éprouvé sur appareil | `public/sw.js`, `/hors-ligne` |  |
 | Historique de performance des prestataires | ✅ | `respond_to_evaluation`, `supplier_track_record`, `v_public_prestataires` (agrégat ≥ 3), évaluations immuables | `inclusion.test.mjs` |
 | Catalogue d'accords-cadres (achats récurrents) | ✅ | `0018` : `create_framework_agreement`, `catalog_attribute_defs`, `place_call_off`, `progress_call_off`, plafond et hausse de prix en base, vues publiques | `catalogue.test.mjs` |
+| Aide à la rédaction TDR/DAO (variables, guides, contrôle qualité, validation conditionnée) | ✅ | `0019` : `document_blocking_issues` + garde du circuit ; `domain/redaction.ts` (linter, parité testée) | `redaction.test.ts`, `redaction-parity.test.ts`, `workflow.test.mjs` |

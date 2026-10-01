@@ -60,6 +60,7 @@ La parité TypeScript ↔ SQL des transitions est vérifiée par `packages/workf
 
 - **Historique des prestataires** : évaluation de fin de marché immuable, droit de réponse du prestataire (une réponse), historique consultable par l'autorité qui évalue ses offres, publication **en moyenne seulement, à partir de 3 évaluations** (`/transparence/prestataires`).
 - **Catalogue électronique d'accords-cadres** : le PRM ouvre un accord sur un marché `ACCORD_CADRE` contractualisé (plafond ≤ montant du contrat) ; le titulaire publie des articles décrits par des **attributs standardisés** (liste fermée par catégorie, aucun texte libre) ; hausses de prix plafonnées (10 %) et historisées ; les autorités commandent au prix figé, dans le plafond, avec restitution du solde en cas d'annulation (`/dashboard/catalogue`, public : `/transparence/catalogue`).
+- **Aide à la rédaction des TDR/DAO** : variables de fusion (`{{reference}}`, `{{autorite}}`, `{{besoin}}`…) remplies depuis le marché et l'expression de besoin ; consignes séparées du texte (une section non rédigée reste vide) ; guide par section (objectif, points à couvrir, exemple, erreurs fréquentes) ; contrôle qualité en direct (formulations floues, marque sans « ou équivalent », conditions restrictives, grille ≠ 100, rubriques manquantes) ; la validation PRM est **refusée en base** tant qu'il reste un texte à compléter, une section obligatoire vide ou une clause type obligatoire manquante (`document_blocking_issues`).
 
 ## Règles métier bloquantes (vérifiées par les tests)
 

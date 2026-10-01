@@ -6,6 +6,8 @@ import {
   appealDecisionSchema, appealSchema, attributionSchema, besoinSchema, conformiteSchema, documentSchema, grilleSchema,
   questionSchema, reponseSchema, reviewSchema, sectionsSchema, formDataToObject,
 } from '@marchepublic/validators'
+import { mergeSections, type DocSection } from '@marchepublic/workflow'
+import { tenderVariables } from '@/lib/redaction'
 import { check, db, guarded, parse, rpc } from '@/lib/action-utils'
 import { ok, type ActionResult } from '@/lib/errors'
 
@@ -55,7 +57,8 @@ export async function createDocument(fd: FormData): Promise<ActionResult<{ id: s
     let contenu: unknown = { sections: [] }
     if (v.template_id) {
       const { data } = check(await supabase.from('document_templates').select('sections').eq('id', v.template_id).single())
-      contenu = { sections: data!.sections }
+      // Les variables ({{reference}}, {{autorite}}…) sont remplacées par les données du marché et du besoin ; les autres restent à compléter.
+      contenu = { sections: mergeSections(data!.sections as DocSection[], await tenderVariables(supabase, v.tender_id)) }
     }
     const { data } = check(await supabase.from('tender_documents').insert({
       tender_id: v.tender_id, institution_id: session.institution_id, type: v.type, titre: v.titre,

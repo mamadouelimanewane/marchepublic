@@ -125,9 +125,19 @@ describe('Cycle de vie complet — 15 phases', { concurrency: false }, () => {
     await assert.rejects(advance('cpm', 'FINALISER_DAO'), /GUARD_PHASE_2/)
     const [d] = await as('sd', () => q(`insert into tender_documents (tender_id, institution_id, type, titre) values ($1,$2,'DAO','DAO fournitures informatiques') returning id`, [TENDER, INST]))
     U._doc = d.id
-    await rpc('sd', `update tender_documents set contenu='{"sections":[{"titre":"Objet","contenu":"..."}]}' where id=$1`, [d.id])
+    await rpc('sd', `update tender_documents set contenu='{"sections":[{"id":"objet","titre":"Objet","contenu":"..."}]}' where id=$1`, [d.id])
     await rpc('sd', `update tender_documents set circuit_statut='RELECTURE_CPM' where id=$1`, [d.id])
     await assert.rejects(rpc('cpm', `update tender_documents set circuit_statut='VALIDE_PRM' where id=$1`, [d.id]), /CIRCUIT_INVALID/)
+    // Aide à la rédaction : un DAO sans clause obligatoire ou avec un texte à compléter ne peut pas être validé par le PRM.
+    await assert.rejects(rpc('prm', `update tender_documents set circuit_statut='VALIDE_PRM' where id=$1`, [d.id]), /DOCUMENT_INCOMPLETE.*MISSING_CLAUSE/)
+    const clauses = await q(`select code, contenu from clause_templates where is_active and obligatoire and (natures is null or 'FOURNITURES' = any(natures))`)
+    const texte = 'Objet du marché : fourniture, livraison et installation du matériel informatique décrit à la section 6.'
+    const sections = (extra = '') => ({ sections: [
+      { id: 'objet', titre: 'Objet', contenu: texte + extra, obligatoire: true },
+      ...clauses.map(c => ({ id: `clause-${c.code}`, titre: c.code, contenu: c.contenu.replaceAll('[●]', '30'), obligatoire: true }))] })
+    await rpc('cpm', `update tender_documents set contenu=$2::jsonb where id=$1`, [d.id, JSON.stringify(sections(' Délai : [●] jours.'))])
+    await assert.rejects(rpc('prm', `update tender_documents set circuit_statut='VALIDE_PRM' where id=$1`, [d.id]), /DOCUMENT_INCOMPLETE.*PLACEHOLDER/)
+    await rpc('cpm', `update tender_documents set contenu=$2::jsonb where id=$1`, [d.id, JSON.stringify(sections())])
     await rpc('prm', `update tender_documents set circuit_statut='VALIDE_PRM' where id=$1`, [d.id])
     const versions = await q('select version, circuit_statut from document_versions where document_id=$1 order by version', [d.id])
     assert.ok(versions.length >= 4, 'une version immuable par changement')

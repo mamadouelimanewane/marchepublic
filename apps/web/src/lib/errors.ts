@@ -14,10 +14,18 @@ const KNOWN: Record<string, string> = {
   AUDIT_IMMUTABLE: 'Le journal d\'audit ne peut pas être modifié.',
 }
 
+const DOC_ISSUES: [RegExp, string][] = [
+  [/EMPTY/g, 'document vide'],
+  [/PLACEHOLDER:([w-]*)/g, 'texte à compléter dans « $1 »'],
+  [/MANDATORY_SHORT:([w-]*)/g, 'section obligatoire « $1 » vide ou trop courte'],
+  [/MISSING_CLAUSE:([w-]*)/g, 'clause type obligatoire manquante (« $1 »)'],
+]
+const readableIssues = (text: string) => DOC_ISSUES.reduce((t, [re, to]) => t.replace(re, to), text)
+
 export function toMessage(error: unknown): string {
   const raw = typeof error === 'string' ? error : (error as { message?: string })?.message ?? 'Erreur inconnue'
   const m = raw.match(/^([A-Z][A-Z0-9_]+): ([\s\S]+)$/)
-  if (m) return KNOWN[m[1]] && !m[2] ? KNOWN[m[1]] : m[2]
+  if (m) return KNOWN[m[1]] && !m[2] ? KNOWN[m[1]] : m[1] === 'DOCUMENT_INCOMPLETE' ? readableIssues(m[2]) : m[2]
   if (/row-level security|permission denied/i.test(raw)) return 'Action non autorisée pour votre rôle ou à ce stade de la procédure.'
   if (/duplicate key/i.test(raw)) return 'Cet enregistrement existe déjà.'
   if (/violates check constraint/i.test(raw)) return 'Une valeur saisie ne respecte pas les règles de gestion.'
