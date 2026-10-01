@@ -6,7 +6,7 @@ export const revalidate = 300
 export default async function HomePage() {
   // Compteurs publics réels (vue sans donnée sensible). Si la base est indisponible, on affiche « — » : jamais de chiffres inventés.
   let stats: { avis_ouverts: number; institutions: number; marches_attribues: number } | null = null
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)) {
     try {
       const supabase = await createSupabaseServerClient()
       const { data } = await supabase.from('v_stats_publiques').select('avis_ouverts, institutions, marches_attribues').single()
