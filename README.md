@@ -1,96 +1,82 @@
-# 🇸🇳 Plateforme Intégrée de Pilotage du Cycle des Marchés Publics
+# 🇸🇳 Plateforme intégrée de pilotage du cycle des marchés publics
 
-Bienvenue dans le dépôt principal de la plateforme de gestion des marchés publics de la République du Sénégal. Ce système dématérialise intégralement la commande publique, de l'inscription au budget (PPM) jusqu'à la réception définitive, en stricte conformité avec le **Décret n°2022-2295**.
+Dématérialisation de la commande publique sénégalaise, de la programmation budgétaire à l'archivage, conformément au
+**Décret n°2022-2295** et au cahier des charges (`docs/` — matrice de conformité : [docs/architecture/matrice-conformite-cdc.md](docs/architecture/matrice-conformite-cdc.md)).
 
----
+## Architecture
 
-## 🏗️ Architecture Technologique
+```
+apps/web            Next.js 15 (App Router, server actions) — back-offices, portail public, dépôt chiffré
+packages/workflow   Phases, transitions, rôles, règles métier pures (seuils, évaluation, plafonds), machine XState générée
+packages/validators Schémas Zod partagés (formulaires, actions, API)
+packages/ui, db     Utilitaires d'interface ; types de base (à régénérer : npm run db:types)
+supabase/migrations 14 migrations : schéma, RLS, moteur de workflow, audit chaîné, reporting, données de référence
+supabase/functions  sigfip-webhook (Trésor) — contrat à aligner sur la spécification réelle
+supabase/tests      Tests d'intégration SQL sur PostgreSQL (pglite) — migrations réelles
+```
 
-Cette application repose sur une architecture moderne orientée sécurité et conformité réglementaire :
+**Principe : la base de données est l'autorité.** Les 15 phases, leurs pré-conditions, les verrous durs (recours, dates limites, plafonds
+30 % / 40 %), la confidentialité des offres et l'audit sont appliqués par des triggers, des politiques RLS et des RPC `SECURITY DEFINER`.
+L'interface ne fait que présenter ; la contourner n'ouvre aucune brèche. Détails : [docs/architecture/securite.md](docs/architecture/securite.md).
 
-- **Monorepo (Turborepo)** : Permet de gérer le front-end, le back-end et les packages (workflow) depuis un dépôt unique.
-- **Frontend (Next.js 15)** : Application React avec Server Components (SSR), conçue pour les connexions bas-débit (low-bandwidth) et accessible sur mobile via Capacitor.
-- **Backend (Supabase / PostgreSQL)** : 
-  - **RLS (Row Level Security)** assurant un fonctionnement multi-tenant strict (chaque Ministère ou Agence est isolé).
-  - Triggers immuables (WORM - Write Once Read Many) pour le journal d'audit (`audit_logs`) garanti anti-corruption.
-- **Workflow Engine (XState v5)** : Orchestration formelle des 15 phases du marché.
+## Démarrage
 
----
+Prérequis : Node 20+, [Supabase CLI](https://supabase.com/docs/guides/cli) + Docker (pour la pile locale).
 
-## 🔒 Règles Métier Bloquantes (Hard Locks)
-
-L'intégrité de la procédure est garantie mathématiquement par la base de données (Triggers) et la State Machine :
-
-1. **Coffre-fort Cryptographique (Phase 6)** : Les offres financières sont chiffrées en AES-256 dans le navigateur du soumissionnaire. La clé de déchiffrement n'est libérée qu'à la Phase 7.
-2. **Recours ARCOP (Phase 10)** : Tout recours déposé bloque systémiquement le passage en Phase 11 (Attribution Définitive) tant qu'il n'est pas rejeté ou jugé irrecevable.
-3. **Plafond Avenants (Phase 13)** : Le cumul des avenants est bloqué au-delà de **30%** du montant initial (Trigger DB).
-4. **Plafond Sous-traitance (Phase 13)** : La sous-traitance est bloquée au-delà de **40%** (Trigger DB).
-5. **Quotas PME/ESS** : Suivi automatisé des quotas obligatoires (5% global, 2% PME féminines).
-
----
-
-## 🚀 Démarrage Rapide (Développement)
-
-### Prérequis
-- [Node.js](https://nodejs.org) (v18+)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (nécessaire pour Supabase Local)
-- [Supabase CLI](https://supabase.com/docs/guides/cli)
-
-### 1. Initialiser la Base de données locale
 ```bash
-# Démarrer l'environnement Supabase local
-npx supabase start
-
-# (Optionnel) Si les migrations ne se sont pas jouées automatiquement
-npx supabase db push
-
-# Peupler la base avec les institutions de test et les seuils
-npm run db:seed
+npm install
+npx supabase start            # applique les migrations (paramètres, nomenclature, modèles, clauses…)
+cp .env.example apps/web/.env.local   # renseigner l'URL locale, la clé anon et la clé service_role affichées par « supabase start »
+npm run db:seed               # comptes et marchés de démonstration (local uniquement ; mots de passe connus)
+npm run dev                   # http://localhost:3000
 ```
 
-### 2. Démarrer l'application (Next.js)
+Comptes de démonstration : `prm@demo.sn`, `cpm@demo.sn`, `demandeur@demo.sn`, `eval1@demo.sn`…, `dcmp@demo.sn`, `arcop@demo.sn`,
+`tresor@demo.sn`, `admin@demo.sn`, `pme1@demo.sn`, `entreprise2@demo.sn` (mot de passe : voir `supabase/seed/index.js`).
+
+## Tests
+
 ```bash
-# Lancer l'environnement de développement (Monorepo Turborepo)
-npm run dev
+npm test            # unitaires (workflow, validateurs) + intégration SQL
+npm run test:unit   # vitest — 52 tests (règles métier, chiffrement des offres, partage de clé, génération de PDF)
+npm run test:db     # 38 tests sur les migrations réelles : cycle des 15 phases, verrous, RLS, étanchéité, audit, contrat code ↔ schéma
 ```
 
-L'application sera accessible sur : [http://localhost:3000](http://localhost:3000)
+Le test `supabase/tests/contract.test.mjs` analyse le code web et échoue si une table, une colonne ou une RPC utilisée n'existe pas dans le schéma.
+La parité TypeScript ↔ SQL des transitions est vérifiée par `packages/workflow/src/__tests__/workflow.test.ts`.
 
----
+## Règles métier bloquantes (vérifiées par les tests)
 
-## 📁 Structure du Projet
+1. **Coffre-fort** : offres chiffrées dans le navigateur ; la clé privée n'est jamais stockée ; aucune offre lisible avant l'ouverture, même par l'administrateur.
+2. **Ouverture** : double signature (CPM + président de commission) ; déchiffrement local ; empreintes SHA-256 contrôlées.
+3. **Recours** : tout recours pendant bloque l'attribution définitive **et** la signature du contrat, y compris par UPDATE SQL direct.
+4. **Avenants ≤ 30 %** et **sous-traitance ≤ 40 %** : dépassement refusé par la base et tracé.
+5. **Quotas PME/ESS 5 % (dont 2 % féminines)** : calcul idempotent, marchés réservés contrôlés au dépôt et à l'attribution.
+6. **Audit WORM chaîné** : écriture seule, chaînage SHA-256, vérification d'intégrité par DCMP/ARCOP/Cour des Comptes.
 
-```text
-marchepublic/
-├── apps/
-│   ├── web/                     # Next.js 15 (Portail public & Dashboard)
-│   │   ├── src/app/(public)/    # Pages accessibles à tous (Avis AO)
-│   │   ├── src/app/(dashboard)/ # Back-office (RBAC selon profil)
-│   │   └── src/components/      # Composants (DepotOffre chiffré, etc.)
-│   └── mobile/                  # Projet Capacitor (iOS/Android)
-├── packages/
-│   ├── workflow/                # Machine à états XState des 15 phases
-│   ├── db/                      # Typages TS générés depuis Supabase
-│   ├── validators/              # Schémas Zod (Validation des formulaires)
-│   └── ui/                      # Composants visuels partagés
-└── supabase/
-    ├── migrations/              # 0001 à 0006 : Les schémas, triggers et RLS
-    ├── functions/               # Edge Functions (ex: webhook SIGFIP)
-    └── seed/                    # Données de démonstration
-```
+## Ce qui a été corrigé par rapport à la version précédente
 
----
+| Problème | Correction |
+|---|---|
+| Journal d'audit insérable par n'importe quel utilisateur | Écriture directe révoquée, fonction dédiée, chaînage cryptographique |
+| Verrou de recours uniquement dans XState (inutilisé) | Verrou en base sur toutes les voies d'accès |
+| Tables `config_seuils`/`corps_metiers` modifiables par tout utilisateur connecté | RLS : lecture publique, écriture ADMIN |
+| Six tables avec RLS activée **sans aucune politique** (documents, lots, évaluations…) | Politiques complètes par rôle |
+| Aucun profil créé à l'inscription ; pas d'écran de connexion | Trigger d'inscription (rôle soumissionnaire uniquement), pages login/register |
+| ADMIN pouvant lire les offres avant l'ouverture ; DCMP/ARCOP bloqués par une comparaison d'institution | Règle unique : phase ≥ 7 |
+| `submitted_at` fourni par le client (horodatage falsifiable) ; doublons d'offres avec lot NULL | Dépôt par RPC, horloge serveur, index unique corrigé |
+| Alerte d'avenant écrite puis annulée avec la transaction | Journalisation par fonction dédiée qui revérifie le dépassement |
+| Mode de passation inventé (bande « AOR à 50 % du seuil ») ; seuils codés en dur | Règle réglementaire AOO/DRP, seuils en base, écart à justifier |
+| Référence `AO-année-aléatoire(1000)` | Séquence par institution et par année |
+| Taux PME non recalculés lors d'un marché non-PME (dénominateur périmé), calcul non idempotent, colonne accentuée | Table d'écritures + recalcul |
+| Enum `arcop_decision` incompatible avec `PARTIELLEMENT_FAVORABLE` | Contrainte corrigée |
+| Middleware : `/recours` interdit aux candidats, en-têtes `x-user-*` de confiance | Droits partagés et testés ; en-têtes supprimés |
+| Page « Assistant IA » simulée par `setTimeout`, modale de paiement mobile simulant un succès, compteurs d'accueil inventés | Remplacées par des modèles réels / supprimées / compteurs réels |
+| Portail public lisant `tenders` sans droit (vide pour un anonyme) | Vue publique `v_avis_publics` |
 
-## 👨‍💻 Matrice des Rôles (RBAC)
+## Reste à faire avant mise en production
 
-Le système adapte automatiquement l'interface et les droits d'accès selon le profil :
-- `SERVICE_DEMANDEUR` : Initialise le PPM et rédige le DAO.
-- `CPM` : Administre le marché de A à Z.
-- `PRM` : Valide, approuve et signe.
-- `DCMP` : Contrôle a priori (Avis de non-objection).
-- `ARCOP` : Traite les recours (Phase 10) et audits ex-post.
-- `SOUMISSIONNAIRE` : Dépôt sécurisé et consultation.
-- `TRESOR` : Visas budgétaires et suivi des paiements.
-- `ADMIN` : Gestion des paramétrages (seuils, corps de métier).
-
-*(Développé par PROCESSINGENIERIE - 2026)*
+Voir la section « ⛔ / 🟡 » de la [matrice de conformité](docs/architecture/matrice-conformite-cdc.md). Points majeurs :
+rejouer les tests sur une pile Supabase réelle et dans un navigateur (WebCrypto), horodatage et signature qualifiés (ADIE), branchements
+SIGFIP / DGID / portail national / mobile money, application Capacitor, 
+test de charge, test d'intrusion, validation juridique des paramètres réglementaires.

@@ -6,14 +6,13 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "tsc --noEmit -p tsconfig.json",
-    "test": "jest"
+    "test": "vitest run"
   },
   "dependencies": {
     "xstate": "^5.18.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
     "@types/node": "^22.0.0",
-    "jest": "^29.7.0"
+    "typescript": "^5.6.0"
   }
 }

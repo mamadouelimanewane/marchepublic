@@ -1,38 +1,23 @@
 import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth'
 
-// MOCK API: Vérification Fiscale et Légale (DGID + RCCM)
-// Dans la réalité, cela se connecte aux API gouvernementales via le NINEA
+// Vérification de régularité fiscale et légale (DGID + RCCM) — CDC §12.
+//
+// ⚠ SIMULATION : aucune API gouvernementale n'est encore branchée. En production, l'endpoint répond 501 pour qu'aucune
+// « conformité » fictive ne soit prise pour une vérification réelle. Le branchement réel exigera les accès DGID/RCCM.
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const ninea = searchParams.get('ninea')
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
-  if (!ninea) {
-    return NextResponse.json({ error: 'NINEA manquant' }, { status: 400 })
+  if (process.env.NODE_ENV === 'production' && process.env.DGID_SIMULATION !== 'true') {
+    return NextResponse.json({ error: 'Intégration DGID non configurée' }, { status: 501 })
   }
 
-  // Simulation d'une latence réseau
-  await new Promise(r => setTimeout(r, 1200))
+  const ninea = new URL(request.url).searchParams.get('ninea')
+  if (!ninea || !/^[0-9A-Z]{7,12}$/i.test(ninea)) return NextResponse.json({ error: 'NINEA manquant ou invalide' }, { status: 400 })
 
-  // Test avec NINEA fictif
-  if (ninea === '123456789') {
-    return NextResponse.json({
-      status: 'CONFORME',
-      ninea: '123456789',
-      entreprise: 'SENEGAL TECH SOLUTIONS SUARL',
-      quitus_fiscal_valide: true,
-      quitus_date_expiration: '2027-01-01',
-      rccm_status: 'ACTIF',
-      rccm_numero: 'SN-DKR-2023-B-1234',
-      is_pme_certifiee: true,
-      is_direction_feminine: false,
-    })
-  } else {
-    // Cas de non-conformité
-    return NextResponse.json({
-      status: 'NON_CONFORME',
-      ninea: ninea,
-      quitus_fiscal_valide: false,
-      motif: "Dette fiscale non soldée de 1.500.000 FCFA"
-    }, { status: 403 })
+  if (ninea === '1234567') {
+    return NextResponse.json({ simulation: true, status: 'CONFORME', ninea, quitus_fiscal_valide: true, rccm_status: 'ACTIF' })
   }
+  return NextResponse.json({ simulation: true, status: 'NON_CONFORME', ninea, quitus_fiscal_valide: false }, { status: 403 })
 }

@@ -7,7 +7,7 @@
     "build": "tailwindcss -i src/app/globals.css -o src/app/tailwind.generated.css --config ../../tailwind.config.js && next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -25,6 +25,7 @@
     "lucide-react": "^0.460.0",
     "next": "^15.5.26",
     "nodemailer": "^6.9.15",
+    "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
@@ -44,7 +45,6 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.26",
-    "jest": "^29.7.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.0"

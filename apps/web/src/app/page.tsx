@@ -1,27 +1,18 @@
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export default async function HomePage() {
-  let totalAO = 12;
-  let totalInstitutions = 4;
+export const revalidate = 300
 
+export default async function HomePage() {
+  // Compteurs publics réels (vue sans donnée sensible). Si la base est indisponible, on affiche « — » : jamais de chiffres inventés.
+  let stats: { avis_ouverts: number; institutions: number; marches_attribues: number } | null = null
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     try {
       const supabase = await createSupabaseServerClient()
-      const [resAO, resInst] = await Promise.all([
-        supabase
-          .from('tenders')
-          .select('*', { count: 'exact', head: true })
-          .gte('current_phase', 'PHASE_4_PUBLICATION'),
-        supabase
-          .from('institutions')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_active', true),
-      ]);
-      totalAO = resAO.count ?? 0;
-      totalInstitutions = resInst.count ?? 0;
+      const { data } = await supabase.from('v_stats_publiques').select('avis_ouverts, institutions, marches_attribues').single()
+      stats = data
     } catch {
-      console.warn('Base de données indisponible : affichage des statistiques de démonstration.')
+      console.warn('Base de données indisponible : compteurs publics non affichés.')
     }
   }
 
@@ -77,16 +68,16 @@ export default async function HomePage() {
         {/* Statistiques publiques */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
           <div className="bg-white/10 backdrop-blur rounded-xl p-6">
-            <p className="text-4xl font-bold text-yellow-300">{totalAO ?? 0}</p>
+            <p className="text-4xl font-bold text-yellow-300">{stats?.avis_ouverts ?? '—'}</p>
             <p className="text-green-100 text-sm mt-1">Appels d'offres actifs</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-6">
-            <p className="text-4xl font-bold text-yellow-300">{totalInstitutions ?? 0}</p>
+            <p className="text-4xl font-bold text-yellow-300">{stats?.institutions ?? '—'}</p>
             <p className="text-green-100 text-sm mt-1">Autorités contractantes</p>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl p-6">
-            <p className="text-4xl font-bold text-yellow-300">15</p>
-            <p className="text-green-100 text-sm mt-1">Phases de workflow conformes</p>
+            <p className="text-4xl font-bold text-yellow-300">{stats?.marches_attribues ?? '—'}</p>
+            <p className="text-green-100 text-sm mt-1">Marchés attribués</p>
           </div>
         </div>
       </section>
@@ -100,7 +91,7 @@ export default async function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { icon: '📋', title: 'Programmation & PPM', desc: 'Plan de Passation des Marchés annuel' },
-              { icon: '📝', title: 'Rédaction assistée', desc: 'TDR et DAO conformes aux modèles DCMP' },
+              { icon: '📝', title: 'Rédaction assistée', desc: 'Modèles de TDR et DAO, clauses types, circuit de validation' },
               { icon: '🔒', title: 'Coffre-fort cryptographique', desc: 'Offres chiffrées AES-256 jusqu\'à l\'ouverture' },
               { icon: '⚖️', title: 'Recours ARCOP', desc: 'Gestion des recours avec blocage automatique' },
               { icon: '📊', title: 'Tableaux de bord', desc: 'KPI par institution, phase et corps de métier' },

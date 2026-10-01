@@ -11,7 +11,9 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
-    "test": "turbo test",
+    "test": "npm run test:unit && npm run test:db",
+    "test:unit": "turbo test",
+    "test:db": "node --test \"supabase/tests/*.test.mjs\"",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:migrate": "supabase db push",
     "db:seed": "node supabase/seed/index.js",
@@ -19,10 +21,13 @@
     "db:types": "supabase gen types typescript --local > packages/db/src/types.ts"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/node": "^22.0.0",
+    "dotenv": "^18.0.5",
     "prettier": "^3.3.0",
+    "turbo": "^2.3.0",
     "typescript": "^5.6.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^2.1.9"
   },
   "engines": {
     "node": ">=18.0.0"

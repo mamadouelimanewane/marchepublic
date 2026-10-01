@@ -1,85 +1,124 @@
+import Link from 'next/link'
+import { PHASES, PHASE_LABELS, ROLE_LABELS, phaseNumber, type TenderPhase } from '@marchepublic/workflow'
+import { requireSession } from '@/lib/auth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { dateFr, fcfa } from '@/lib/format'
+import { Alert, Badge, Card, DataTable, PageHeader, Stat } from '@/components/ui'
 import { WorkflowBadge } from '@/components/workflow/WorkflowBadge'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardHome() {
+  const session = await requireSession('/dashboard')
   const supabase = await createSupabaseServerClient()
+  const role = session.role
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  // Données de l'utilisateur
-  const { data: profile } = await supabase
-    .from('users')
-    .select('full_name, role, institution_id')
-    .eq('id', user.id)
-    .single()
-
-  // Statistiques
-  const [
-    { count: totalEnCours },
-    { count: totalAClore },
-    { data: recentTenders }
-  ] = await Promise.all([
-    supabase.from('tenders')
-      .select('*', { count: 'exact', head: true })
-      .neq('current_phase', 'PHASE_15_CLOTURE_ARCHIVAGE'),
-    supabase.from('tenders')
-      .select('*', { count: 'exact', head: true })
-      .eq('current_phase', 'PHASE_14_RECEPTION_PAIEMENT'),
-    supabase.from('tenders')
-      .select('id, reference, title, current_phase, montant_estime')
-      .order('created_at', { ascending: false })
-      .limit(5)
+  const [pipeline, recent, notifications, alertes, recours, dcmp, besoins] = await Promise.all([
+    supabase.from('v_pipeline_phases').select('current_phase, nb_marches, montant_estime_total'),
+    supabase.from('tenders').select('id, reference, title, current_phase, montant_estime, date_limite_depot').order('updated_at', { ascending: false }).limit(6),
+    supabase.from('notifications').select('id, titre, message, created_at, read_at, tender_id').order('created_at', { ascending: false }).limit(5),
+    supabase.from('v_alertes').select('tender_id, reference, type_alerte, message').limit(6),
+    supabase.from('appeals').select('id', { count: 'exact', head: true }).in('status', ['DEPOSE', 'EN_INSTRUCTION']),
+    supabase.from('v_dcmp_en_attente').select('tender_id, reference, title, institution, jours_attente').order('jours_attente', { ascending: false }).limit(5),
+    supabase.from('besoins').select('id', { count: 'exact', head: true }).eq('statut', 'SOUMIS'),
   ])
 
-  const { count: totalRecours } = await supabase.from('appeals')
-    .select('*', { count: 'exact', head: true })
-    .in('status', ['DEPOSE', 'EN_INSTRUCTION'])
+  // Agrégation par phase (plusieurs lignes par institution pour les régulateurs)
+  const byPhase = new Map<TenderPhase, number>()
+  for (const row of pipeline.data ?? []) byPhase.set(row.current_phase as TenderPhase, (byPhase.get(row.current_phase as TenderPhase) ?? 0) + row.nb_marches)
+  const total = [...byPhase.values()].reduce((a, b) => a + b, 0)
+  const enCours = total - (byPhase.get('PHASE_15_CLOTURE_ARCHIVAGE') ?? 0)
+  const max = Math.max(1, ...byPhase.values())
+  const isBidder = role === 'SOUMISSIONNAIRE'
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Tableau de bord — {profile?.role || 'Utilisateur'}</h1>
+    <div className="mx-auto max-w-7xl">
+      <PageHeader title={`Bonjour ${session.full_name.split(' ')[0]}`} subtitle={`${ROLE_LABELS[role]}${session.institution ? ` — ${session.institution.name}` : ''}`} />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 mb-1">Marchés en cours</p>
-          <p className="text-3xl font-bold text-gray-900">{totalEnCours ?? '—'}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 mb-1">En attente de clôture</p>
-          <p className="text-3xl font-bold text-gray-900">{totalAClore ?? '—'}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <p className="text-sm font-medium text-gray-500 mb-1">Recours en cours</p>
-          <p className="text-3xl font-bold text-red-600">{totalRecours ?? '—'}</p>
-        </div>
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+        {isBidder ? (
+          <>
+            <Stat label="Avis ouverts" value={(byPhase.get('PHASE_5_CLARIFICATIONS') ?? 0) + (byPhase.get('PHASE_6_DEPOT_OFFRES') ?? 0)} />
+            <Stat label="Mes marchés suivis" value={total} />
+            <Stat label="Notifications non lues" value={(notifications.data ?? []).filter(n => !n.read_at).length} tone="amber" />
+          </>
+        ) : (
+          <>
+            <Stat label="Marchés en cours" value={enCours} />
+            <Stat label="Recours en cours" value={recours.count ?? 0} tone={recours.count ? 'red' : 'gray'} hint={recours.count ? 'Attribution définitive bloquée' : undefined} />
+            {role === 'PRM' && <Stat label="Besoins à valider" value={besoins.count ?? 0} tone={besoins.count ? 'amber' : 'gray'} />}
+            {role === 'DCMP' && <Stat label="Avis en attente" value={dcmp.data?.length ?? 0} tone="amber" />}
+            <Stat label="Alertes" value={alertes.data?.length ?? 0} tone={alertes.data?.length ? 'amber' : 'gray'} />
+          </>
+        )}
       </div>
 
-      {/* Recent Tenders */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">Dossiers récents</h2>
-        </div>
-        <div className="divide-y divide-gray-200">
-          {recentTenders?.length ? recentTenders.map(tender => (
-            <div key={tender.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-              <div className="flex-1 pr-4">
-                <p className="text-sm font-bold text-green-800 mb-0.5">{tender.reference}</p>
-                <p className="text-sm text-gray-600 line-clamp-1">{tender.title}</p>
-                <p className="text-xs text-gray-400 mt-1">Montant estimé : {tender.montant_estime?.toLocaleString('fr-SN') ?? 'Non renseigné'} FCFA</p>
-              </div>
-              <div className="text-right">
-                <WorkflowBadge phase={tender.current_phase as any} />
-              </div>
-            </div>
-          )) : (
-            <div className="px-6 py-8 text-center text-gray-500 text-sm">
-              Aucun marché trouvé pour votre institution.
-            </div>
+      {(role === 'DCMP') && (
+        <Card title="Dossiers en attente d'avis" className="mb-6" padded={false}>
+          <DataTable rows={dcmp.data} rowKey={r => r.tender_id} empty="Aucun dossier en attente."
+            columns={[
+              { header: 'Référence', cell: r => <Link className="font-medium text-green-800 hover:underline" href={`/dashboard/dcmp/${r.tender_id}`}>{r.reference}</Link> },
+              { header: 'Objet', cell: r => r.title },
+              { header: 'Autorité contractante', cell: r => r.institution },
+              { header: 'Attente', cell: r => <Badge tone={Number(r.jours_attente) > 7 ? 'red' : 'amber'}>{r.jours_attente} j</Badge> },
+            ]} />
+        </Card>
+      )}
+
+      <div className="mb-6 grid gap-6 lg:grid-cols-2">
+        <Card title="Répartition par phase" subtitle="Nombre de marchés à chaque étape du cycle de vie">
+          <ul className="space-y-1.5">
+            {PHASES.map(p => (
+              <li key={p} className="flex items-center gap-2 text-xs">
+                <span className="w-44 flex-shrink-0 truncate text-gray-600">{PHASE_LABELS[p]}</span>
+                <span className="h-4 flex-1 rounded bg-gray-100">
+                  <span className="block h-4 rounded bg-green-600" style={{ width: `${((byPhase.get(p) ?? 0) / max) * 100}%` }} />
+                </span>
+                <span className="w-6 text-right font-semibold text-gray-700">{byPhase.get(p) ?? 0}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <div className="space-y-6">
+          <Card title="Notifications" padded={false}>
+            <ul className="divide-y divide-gray-100">
+              {(notifications.data ?? []).length ? notifications.data!.map(n => (
+                <li key={n.id} className="px-5 py-3 text-sm">
+                  <p className={n.read_at ? 'text-gray-600' : 'font-semibold text-gray-900'}>{n.titre}</p>
+                  {n.message && <p className="text-xs text-gray-500">{n.message}</p>}
+                  <p className="text-xs text-gray-400">{dateFr(n.created_at, true)}</p>
+                </li>
+              )) : <li className="px-5 py-6 text-center text-sm text-gray-500">Aucune notification.</li>}
+            </ul>
+          </Card>
+          {!isBidder && (
+            <Card title="Alertes" padded={false}>
+              {(alertes.data ?? []).length ? (
+                <ul className="divide-y divide-gray-100">
+                  {alertes.data!.map((a, i) => (
+                    <li key={i} className="px-5 py-3 text-sm">
+                      <Link href={`/dashboard/marches/${a.tender_id}`} className="font-medium text-green-800 hover:underline">{a.reference}</Link>
+                      <p className="text-xs text-gray-600">{a.message}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="px-5 py-6 text-center text-sm text-gray-500">Aucune alerte.</p>}
+            </Card>
           )}
         </div>
       </div>
+
+      <Card title="Dossiers récemment modifiés" actions={<Link href="/dashboard/marches" className="text-sm font-medium text-green-700 hover:underline">Tous les marchés →</Link>} padded={false}>
+        <DataTable rows={recent.data} rowKey={r => r.id} empty={<Alert>Aucun marché visible pour votre profil.</Alert>}
+          columns={[
+            { header: 'Référence', cell: r => <Link className="font-medium text-green-800 hover:underline" href={`/dashboard/marches/${r.id}`}>{r.reference}</Link> },
+            { header: 'Objet', cell: r => <span className="line-clamp-1">{r.title}</span> },
+            { header: 'Montant estimé', cell: r => fcfa(r.montant_estime), className: 'whitespace-nowrap' },
+            { header: 'Phase', cell: r => <WorkflowBadge phase={r.current_phase as TenderPhase} /> },
+          ]} />
+      </Card>
+      <p className="mt-2 text-right text-xs text-gray-400">{PHASES.length} phases — {phaseNumber('PHASE_15_CLOTURE_ARCHIVAGE')} étapes réglementaires</p>
     </div>
   )
 }

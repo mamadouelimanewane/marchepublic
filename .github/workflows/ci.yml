@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Typage strict de chaque paquet et de l'application
+      - run: npx tsc --noEmit -p packages/workflow/tsconfig.json
+      - run: npx tsc --noEmit -p packages/validators/tsconfig.json
+      - run: npx tsc --noEmit -p apps/web/tsconfig.json
+
+      # Tests unitaires : règles métier, transitions, validateurs
+      - run: npm run test:unit
+
+      # Tests d'intégration SQL (PostgreSQL WASM) : migrations réelles, RLS, verrous, audit chaîné, contrat code ↔ schéma
+      - run: npm run test:db
+
+      # Build de production
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder

@@ -1,161 +1,126 @@
 'use client'
 
 import { useState } from 'react'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { encryptForMarket } from '@/lib/crypto'
+import { submitBid } from '@/app/dashboard/actions/passation'
 
 interface DepotOffreProps {
   tenderId: string
-  /** Clé publique RSA-OAEP au format Base64 SPKI. La clé privée doit rester hors de la plateforme. */
+  /** Clé publique RSA-OAEP (SPKI base64) du marché. La clé privée reste hors de la plateforme. */
   publicKey: string
+  keyFingerprint?: string | null
+  dateLimite: string
+  /** Marché alloti : lot visé par ce dépôt. */
+  lotId?: string
+  lotLabel?: string
 }
 
-function toBase64(value: ArrayBuffer) {
-  const bytes = new Uint8Array(value)
-  let binary = ''
-  bytes.forEach(byte => { binary += String.fromCharCode(byte) })
-  return btoa(binary)
-}
+const MAX_SIZE = 20 * 1024 * 1024
+const fileInput = 'block w-full text-sm text-gray-500 file:mr-4 file:rounded-full file:border-0 file:bg-purple-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-purple-700 hover:file:bg-purple-100'
 
-export default function DepotOffreComponent({ tenderId, publicKey }: DepotOffreProps) {
-  const [file, setFile] = useState<File | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+export default function DepotOffreComponent({ tenderId, publicKey, keyFingerprint, dateLimite, lotId, lotLabel }: DepotOffreProps) {
+  const router = useRouter()
+  const [technique, setTechnique] = useState<File | null>(null)
+  const [financier, setFinancier] = useState<File | null>(null)
+  const [step, setStep] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
-  
-  const supabase = createSupabaseBrowserClient()
+  const [receipt, setReceipt] = useState<string | null>(null)
 
-  const handleEncryptAndSubmit = async (e: React.FormEvent) => {
+  const check = (f: File, label: string) => {
+    if (f.type !== 'application/pdf') throw new Error(`${label} : un fichier PDF est requis.`)
+    if (f.size > MAX_SIZE) throw new Error(`${label} : 20 Mo maximum.`)
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!file) return
-    
-    setIsSubmitting(true)
-    setProgress(10)
-    
+    if (!technique || !financier) return
     try {
-      if (file.type !== 'application/pdf' || file.size > 20 * 1024 * 1024) {
-        throw new Error('Sélectionnez un PDF de 20 Mo maximum.')
-      }
-      if (!publicKey) throw new Error('La clé publique de dépôt de ce marché est manquante.')
-
-      // Envelope encryption: AES-GCM for the dossier, RSA-OAEP for its random AES key.
-      const rawPublicKey = Uint8Array.from(atob(publicKey), character => character.charCodeAt(0))
-      const rsaKey = await crypto.subtle.importKey(
-        'spki', rawPublicKey, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
-      )
-      const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt'])
-      const iv = crypto.getRandomValues(new Uint8Array(12))
-      const encryptedData = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, await file.arrayBuffer())
-      const wrappedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaKey, await crypto.subtle.exportKey('raw', aesKey))
-      const envelope = JSON.stringify({ version: 1, algorithm: 'RSA-OAEP-256+A256GCM', iv: toBase64(iv.buffer), wrappedKey: toBase64(wrappedKey), ciphertext: toBase64(encryptedData) })
-      const encryptedBlob = new Blob([envelope], { type: 'application/json' })
-      const digest = await crypto.subtle.digest('SHA-256', await encryptedBlob.arrayBuffer())
-      const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
-      setProgress(55)
-
+      check(technique, 'Offre technique'); check(financier, 'Offre financière')
+      if (!publicKey) throw new Error('La clé de chiffrement de ce marché n\'est pas disponible.')
+      const supabase = createSupabaseBrowserClient()
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) throw new Error('Reconnectez-vous avant de déposer une offre.')
-      const { data: tender, error: tenderError } = await supabase
-        .from('tenders').select('institution_id, current_phase, date_limite_depot').eq('id', tenderId).single()
-      if (tenderError || !tender) throw new Error('Marché introuvable ou inaccessible.')
-      if (tender.current_phase !== 'PHASE_6_DEPOT_OFFRES' || !tender.date_limite_depot || Date.now() >= new Date(tender.date_limite_depot).getTime()) {
-        throw new Error('La période de dépôt est fermée pour ce marché.')
-      }
 
-      // Le chemin ne contient aucun nom de fichier fourni par l'utilisateur.
-      const filePath = `${tenderId}/${user.id}/${crypto.randomUUID()}.envelope.json`
-      const { error: uploadError } = await supabase.storage
-        .from('bids')
-        .upload(filePath, encryptedBlob, { contentType: 'application/json', upsert: false })
-        
-      if (uploadError) throw uploadError
-      
-      setProgress(80)
-      
-      // 4. Créer l'enregistrement dans la base de données
-      const { error: dbError } = await supabase
-        .from('bids')
-        .insert({
-          tender_id: tenderId,
-          institution_id: tender.institution_id,
-          soumissionnaire_id: user.id,
-          status: 'SOUMISE',
-          fichier_financier_path: filePath,
-          fichier_financier_encrypted: true,
-          fichier_financier_hash: hash,
-          submitted_at: new Date().toISOString(),
-        })
+      setStep('Chiffrement dans votre navigateur…'); setProgress(10)
+      const [tech, fin] = await Promise.all([
+        technique.arrayBuffer().then(b => encryptForMarket(b, publicKey)),
+        financier.arrayBuffer().then(b => encryptForMarket(b, publicKey)),
+      ])
+      setProgress(45)
 
-      if (dbError) {
-        await supabase.storage.from('bids').remove([filePath])
-        throw dbError
+      // Aucun nom de fichier fourni par l'utilisateur n'entre dans le chemin de stockage.
+      const base = `${tenderId}/${user.id}`
+      const techPath = `${base}/${crypto.randomUUID()}.technique.envelope.json`
+      const finPath = `${base}/${crypto.randomUUID()}.financier.envelope.json`
+      setStep('Transmission sécurisée…')
+      const up1 = await supabase.storage.from('bids').upload(techPath, tech.blob, { contentType: 'application/json', upsert: false })
+      if (up1.error) throw new Error(/row-level security|policy/i.test(up1.error.message) ? 'Le dépôt est fermé ou la date limite est dépassée.' : up1.error.message)
+      setProgress(70)
+      const up2 = await supabase.storage.from('bids').upload(finPath, fin.blob, { contentType: 'application/json', upsert: false })
+      if (up2.error) { await supabase.storage.from('bids').remove([techPath]); throw new Error(up2.error.message) }
+      setProgress(85)
+
+      // Enregistrement : horodatage, contrôles et accusé de réception par le SERVEUR.
+      setStep('Enregistrement et accusé de réception…')
+      const res = await submitBid({ tender_id: tenderId, lot_id: lotId ?? null, technique_path: techPath, technique_hash: tech.hash, financier_path: finPath, financier_hash: fin.hash })
+      if (!res.ok) {
+        await supabase.storage.from('bids').remove([techPath, finPath])
+        throw new Error(res.message)
       }
-      
       setProgress(100)
-      toast.success('Votre offre a été chiffrée et déposée avec succès dans le coffre-fort numérique.')
-      
-    } catch (err: any) {
-      console.error(err)
-      toast.error('Erreur lors du dépôt : ' + (err.message || 'Erreur inconnue'))
+      setReceipt(res.data?.receipt ?? null)
+      toast.success(res.message)
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors du dépôt')
     } finally {
-      setIsSubmitting(false)
+      setStep(null)
     }
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm max-w-2xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="bg-purple-100 p-3 rounded-full">
-          <span className="text-xl">🔒</span>
-        </div>
+    <div className="mx-auto max-w-2xl rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="rounded-full bg-purple-100 p-3" aria-hidden>🔒</div>
         <div>
-          <h2 className="text-lg font-bold text-gray-800">Coffre-fort Cryptographique</h2>
-          <p className="text-sm text-gray-500">
-            Le PDF est chiffré dans votre navigateur avec une clé aléatoire AES-GCM. Cette clé est scellée avec la clé publique RSA du marché.
-          </p>
+          <h2 className="text-lg font-bold text-gray-800">Coffre-fort cryptographique{lotLabel ? ` — ${lotLabel}` : ''}</h2>
+          <p className="text-sm text-gray-500">Vos deux dossiers sont chiffrés dans votre navigateur (AES-256-GCM) ; la clé est scellée avec la clé publique du marché (RSA-OAEP 3072).
+            Personne ne peut les lire avant l'ouverture officielle des plis. Date limite : <strong>{dateLimite}</strong>.</p>
         </div>
       </div>
 
-      <form onSubmit={handleEncryptAndSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Dossier de l'offre (PDF)
-          </label>
-          <input 
-            type="file" 
-            accept=".pdf"
-            required
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-          />
-        </div>
-
-        <div>
-          <p className="text-sm text-gray-600">
-            Vérifiez que le PDF contient toutes les pièces administratives, techniques et financières requises.
-          </p>
-        </div>
-
-        {isSubmitting && (
-          <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
-            <div className="bg-purple-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+      <form onSubmit={onSubmit} className="space-y-5">
+        <label className="block text-sm font-medium text-gray-700">Offre technique et dossier administratif (PDF)
+          <input type="file" accept="application/pdf,.pdf" required onChange={e => setTechnique(e.target.files?.[0] ?? null)} className={fileInput} />
+        </label>
+        <label className="block text-sm font-medium text-gray-700">Offre financière (PDF)
+          <input type="file" accept="application/pdf,.pdf" required onChange={e => setFinancier(e.target.files?.[0] ?? null)} className={fileInput} />
+        </label>
+        {step && (
+          <div aria-live="polite">
+            <p className="mb-1 text-xs text-gray-600">{step}</p>
+            <div className="h-2.5 w-full rounded-full bg-gray-200"><div className="h-2.5 rounded-full bg-purple-600 transition-all" style={{ width: `${progress}%` }} /></div>
           </div>
         )}
-
-        <button 
-          type="submit" 
-          disabled={isSubmitting || !file}
-          className="w-full bg-purple-700 text-white font-semibold py-2.5 rounded-lg hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isSubmitting ? 'Chiffrement et transmission en cours...' : 'Chiffrer et Sceller mon offre'}
+        <button type="submit" disabled={!!step || !technique || !financier}
+          className="w-full rounded-lg bg-purple-700 py-2.5 font-semibold text-white hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-50">
+          {step ? 'Traitement en cours…' : 'Chiffrer et déposer mon offre'}
         </button>
       </form>
-      
-      <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
-        <span>⚠</span>
-        <p className="text-xs text-yellow-800 text-justify">
-          <strong>À savoir :</strong> Le condensat SHA-256 du dossier chiffré est conservé avec l'offre. La clé privée RSA permettant l'ouverture doit rester sous le contrôle indépendant de l'autorité compétente.
-        </p>
-      </div>
+
+      {receipt && (
+        <div role="status" className="mt-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+          <p className="font-semibold">Accusé de réception</p>
+          <p className="break-all text-xs">Empreinte : {receipt}</p>
+          <p className="mt-1 text-xs">Conservez cette empreinte. Vous pouvez remplacer ou retirer votre offre jusqu'à la date limite.</p>
+        </div>
+      )}
+      <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+        Empreinte de la clé publique du marché : <code className="break-all">{keyFingerprint ?? '—'}</code>. Le déposant n'a rien à conserver : seule la commission, avec la clé privée confiée à son président, peut ouvrir les plis.
+      </p>
     </div>
   )
 }
