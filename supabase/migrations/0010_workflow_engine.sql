@@ -440,6 +440,10 @@ BEGIN
     END LOOP;
   END IF;
 
+  IF p_to = 'PHASE_5_CLARIFICATIONS' THEN
+    PERFORM enqueue_tender_alerts(p_tender);       -- alertes PME (file d'envoi + notifications) ; défini en 0016
+  END IF;
+
   IF p_to = 'PHASE_4_PUBLICATION' THEN
     FOR r IN SELECT id FROM users WHERE institution_id = v_t.institution_id AND role IN ('PRM', 'CPM') AND is_active LOOP
       PERFORM notify_user(r.id, p_tender, 'AVIS_DCMP', 'Avis DCMP favorable', 'Le marché ' || v_t.reference || ' peut être publié.');

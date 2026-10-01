@@ -39,7 +39,7 @@ Comptes de démonstration : `prm@demo.sn`, `cpm@demo.sn`, `demandeur@demo.sn`, `
 ```bash
 npm test            # unitaires (workflow, validateurs) + intégration SQL
 npm run test:unit   # vitest — 52 tests (règles métier, chiffrement des offres, partage de clé, génération de PDF)
-npm run test:db     # 45 tests sur les migrations réelles : cycle des 15 phases, verrous, RLS, étanchéité, audit, OCDS, risques, contrat code ↔ schéma
+npm run test:db     # 51 tests sur les migrations réelles : cycle des 15 phases, verrous, RLS, étanchéité, audit, OCDS, risques, inclusion, contrat code ↔ schéma
 ```
 
 Le test `supabase/tests/contract.test.mjs` analyse le code web et échoue si une table, une colonne ou une RPC utilisée n'existe pas dans le schéma.
@@ -51,6 +51,12 @@ La parité TypeScript ↔ SQL des transitions est vérifiée par `packages/workf
 - **Portail citoyen** `/transparence` : marchés, offres et classement après attribution, contrats, avenants, paiements ; `/signalement` : signalement anonyme avec code de suivi (débit limité par la base), lu uniquement par les régulateurs.
 - **Alertes de risque** `/dashboard/risques` : offre unique, délai court, attribution hors classement, prix supérieur à l'estimation, avenants proches du plafond, gagnant récurrent, nouveau fournisseur, recours favorable, entente directe. Examens immuables (boucle de rétroaction).
 - **Ancrage du journal d'audit** : empreintes de tête publiées chaque jour (`/transparence/ancrage`, `/api/audit/anchors`, tâche `CRON_SECRET`). Une réécriture complète de la chaîne, invisible de la chaîne seule, est détectée (testé).
+
+## Inclusion des PME
+
+- **Dossier permanent du fournisseur** (`/dashboard/mes-documents`) : quitus fiscal, RCCM, CNSS… déposés une fois, vérifiés par l'administration, jugés **à la date limite de dépôt** ; alerte avant expiration ; visibles du personnel d'une autorité seulement après l'ouverture des plis.
+- **Alertes d'appels d'offres** (`/dashboard/mes-alertes`) par secteur, nature et montant, par e-mail, SMS ou WhatsApp, via une file d'envoi. Les marchés réservés PME/ESS ne sont signalés qu'aux fournisseurs éligibles. L'envoi réel dépend d'un fournisseur configuré (`SMTP_URL`, webhooks SMS/WhatsApp) : sans configuration, les messages restent en attente.
+- **Faible débit** : application installable (PWA) avec accès hors ligne aux seules pages publiques (jamais aux pages connectées), reprise automatique du téléversement des pièces.
 
 ## Règles métier bloquantes (vérifiées par les tests)
 

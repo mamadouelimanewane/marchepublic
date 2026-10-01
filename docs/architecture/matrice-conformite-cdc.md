@@ -97,3 +97,12 @@ Limites de l'allotissement : un recours suspend l'ensemble du marché (pas de re
 | Ancrage du journal d'audit | ✅ publication quotidienne ; ⛔ horodatage externe qualifié (RFC 3161) | `anchor_audit_chain`, `verify_audit_anchors`, `v_audit_anchors` | idem (attaque par réécriture complète) |
 
 Positionnement : la plateforme nationale APPEL (ARCOP, octobre 2025) existe ; ces fonctions font de cette application une couche de contrôle, de transparence et d'inclusion interopérable via OCDS.
+
+## Inclusion des PME
+
+| Fonctionnalité | État | Mise en œuvre | Test |
+|---|---|---|---|
+| Dossier permanent du fournisseur | ✅ | `supplier_documents`, `supplier_pieces`, stockage privé, vérification ADMIN/DCMP, alertes d'expiration | `inclusion.test.mjs` |
+| Alertes d'appels d'offres | ✅ file d'envoi, ciblage, éligibilité ; 🟡 envoi réel non vérifié (SMTP/opérateurs non disponibles ici) | `tender_alert_subscriptions`, `outbox_messages`, `/api/cron/maintenance` | `inclusion.test.mjs` |
+| Vérification automatique NINEA/RCCM/quitus auprès de la DGID | ⛔ | Les pièces sont vérifiées manuellement ; le connecteur DGID exige un accès |  |
+| Mode faible débit / hors ligne | 🟡 service worker limité aux pages publiques ; non éprouvé sur appareil | `public/sw.js`, `/hors-ligne` |  |

@@ -26,7 +26,7 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
   const criteres = (t.criteres_evaluation ?? []) as { critere: string; ponderation: number }[]
 
   const [bidsRes, sigs, members, evals, rankings] = await Promise.all([
-    supabase.from('bids').select('id, status, montant_offre, conformite_admin, motif_non_conformite, submitted_at, lot_id, lots:lot_id(numero_lot, libelle), fichier_technique_path, fichier_financier_path, fichier_technique_hash, fichier_financier_hash, users:soumissionnaire_id(full_name, ninea, is_pme)').eq('tender_id', id).order('submitted_at'),
+    supabase.from('bids').select('id, soumissionnaire_id, status, montant_offre, conformite_admin, motif_non_conformite, submitted_at, lot_id, lots:lot_id(numero_lot, libelle), fichier_technique_path, fichier_financier_path, fichier_technique_hash, fichier_financier_hash, users:soumissionnaire_id(full_name, ninea, is_pme)').eq('tender_id', id).order('submitted_at'),
     supabase.from('opening_signatures').select('signer_role, signed_at').eq('tender_id', id),
     supabase.from('commission_members').select('user_id, role_commission, users(full_name)').eq('tender_id', id),
     supabase.from('bid_evaluations').select('bid_id, evaluateur_id, score_technique, grille_technique').eq('tender_id', id).eq('round', t.evaluation_round),
@@ -34,6 +34,15 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
   ])
   const bids = (bidsRes.data ?? []) as any[]
   const isStaff = ['CPM', 'PRM'].includes(session.role)
+  // Pièces administratives du dossier permanent, jugées à la date limite de dépôt (et non à la date du jour).
+  const deadline = t.date_limite_depot ? String(t.date_limite_depot).slice(0, 10) : undefined
+  const piecesByBid = new Map<string, { type: string; situation: string }[]>()
+  if (isStaff && n >= 7) {
+    await Promise.all(bids.map(async b => {
+      const { data } = await supabase.rpc('supplier_pieces', { p_user: b.soumissionnaire_id, p_at: deadline })
+      piecesByBid.set(b.id, (data ?? []) as { type: string; situation: string }[])
+    }))
+  }
   const me = (members.data ?? []).find(m => m.user_id === session.id)
   const isPresident = me?.role_commission === 'PRESIDENT'
   const canGrade = !!me && me.role_commission !== 'OBSERVATEUR' && t.current_phase === 'PHASE_8_EVALUATION'
@@ -82,7 +91,7 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
         <Card title="2. Conformité administrative et montants" subtitle="Retard automatiquement rejeté et tracé. Saisissez le montant relevé dans l'offre financière." padded={false}>
           <DataTable rows={bids} rowKey={b => b.id} empty="Aucune offre reçue."
             columns={[
-              { header: 'Candidat', cell: (b: any) => <span><strong>{showIdentities ? b.users?.full_name ?? '—' : alias(bids.indexOf(b))}</strong>{b.lots && <Badge tone="blue" className="ml-2">Lot {b.lots.numero_lot}</Badge>}{showIdentities && b.users?.is_pme && <Badge tone="amber" className="ml-2">PME</Badge>}<br /><span className="text-xs text-gray-400">Déposée le {dateFr(b.submitted_at, true)}</span></span> },
+              { header: 'Candidat', cell: (b: any) => <span><strong>{showIdentities ? b.users?.full_name ?? '—' : alias(bids.indexOf(b))}</strong>{b.lots && <Badge tone="blue" className="ml-2">Lot {b.lots.numero_lot}</Badge>}{isStaff && piecesByBid.has(b.id) && (() => { const ps = piecesByBid.get(b.id)!; const bad = ps.filter(p => p.situation !== 'VALIDE'); return <><br /><span className={bad.length ? 'text-xs text-red-700' : 'text-xs text-green-700'} title={bad.map(p => `${p.type}: ${p.situation}`).join(' · ')}>Pièces : {ps.length - bad.length}/{ps.length} valides{bad.length ? ` (${bad.map(p => p.type).join(', ')})` : ''}</span></> })()}{showIdentities && b.users?.is_pme && <Badge tone="amber" className="ml-2">PME</Badge>}<br /><span className="text-xs text-gray-400">Déposée le {dateFr(b.submitted_at, true)}</span></span> },
               { header: 'Statut', cell: (b: any) => <Badge tone={b.status === 'CONFORME' || b.status === 'EVALUEE' ? 'green' : ['RETARDEE', 'NON_CONFORME', 'REJETEE'].includes(b.status) ? 'red' : 'blue'}>{b.status}</Badge> },
               { header: 'Montant', cell: (b: any) => fcfa(b.montant_offre) },
               { header: 'Contrôle', cell: (b: any) => isStaff && ['SOUMISE', 'CONFORME', 'NON_CONFORME'].includes(b.status) && ['PHASE_7_OUVERTURE_PLIS', 'PHASE_8_EVALUATION'].includes(t.current_phase) ? (

@@ -1,0 +1,14 @@
+{
+  "name": "Marchés publics du Sénégal",
+  "short_name": "Marchés publics",
+  "description": "Appels d'offres, dépôt chiffré des offres, suivi des marchés et transparence de la commande publique.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#14532d",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
