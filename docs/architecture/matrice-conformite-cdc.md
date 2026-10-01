@@ -72,6 +72,16 @@ Légende : ✅ implémenté et testé · 🟡 implémenté, non testé en condit
 Ces valeurs sont paramétrables (`/dashboard/admin`) mais n'ont pas été validées par un juriste des marchés publics :
 `DELAI_RECOURS_JOURS` (10), `DELAI_INSTRUCTION_RECOURS_JOURS` (7), délais minimaux de dépôt (AOO 30, AOR 21, DRP 10…), `EVAL_SEUIL_TECHNIQUE` (70), pondération technique/financière (70/30 ; 80/20 prestations intellectuelles), `ARCHIVAGE_DUREE_ANS` (10), ainsi que tous les taux `[●]` des clauses types (garanties, pénalités).
 
+## Vérification sur base réelle
+
+Les 64 scénarios SQL ont été rejoués sur un projet Supabase réel (migrations 0001-0020) : **64 réussis**, aucun enregistrement laissé (tout s'exécute dans une transaction annulée à la fermeture de la connexion).
+
+```bash
+REMOTE_DB_URL="postgres://postgres.<ref>:<mot-de-passe>@<hote>:5432/postgres" npm run test:db:remote -- supabase/tests/workflow.test.mjs
+```
+
+À n'utiliser que sur une base de test (les tests créent temporairement des institutions et des comptes, annulés à la fin).
+
 ## Compléments (procédure infructueuse, allotissement)
 
 | Exigence | État | Mise en œuvre | Test |

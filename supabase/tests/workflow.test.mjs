@@ -27,7 +27,7 @@ async function mkUser(key, role, institution, extra = {}) {
 
 before(async () => {
   db = await createDb()
-  INST = (await q(`insert into institutions (code, name, type) values ('MEFP', 'Ministère test', 'ETAT') returning id`))[0].id
+  INST = (await q(`insert into institutions (code, name, type) values ('TMEF', 'Ministère test', 'ETAT') returning id`))[0].id
   await mkUser('sd', 'SERVICE_DEMANDEUR', INST)
   await mkUser('prm', 'PRM', INST)
   await mkUser('cpm', 'CPM', INST)
@@ -86,7 +86,7 @@ describe('Cycle de vie complet — 15 phases', { concurrency: false }, () => {
     const [{ programmer_besoin }] = await rpc('prm', 'select programmer_besoin($1,$2)', [b.id, 'VALIDER'])
     TENDER = programmer_besoin
     const [t] = await q('select reference, mode_passation, mode_suggere, current_phase from tenders where id=$1', [TENDER])
-    assert.match(t.reference, /^MP-MEFP-\d{4}-0001$/)
+    assert.match(t.reference, /^MP-TMEF-\d{4}-0001$/)
     assert.equal(t.mode_passation, 'AOO')          // 80 M ≥ seuil État fournitures (50 M)
     assert.equal(t.current_phase, 'PHASE_1_PROGRAMMATION')
   })

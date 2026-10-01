@@ -24,6 +24,7 @@ GRANT USAGE ON SCHEMA auth, storage TO anon, authenticated, service_role;
 `
 
 export async function createDb({ upTo } = {}) {
+  if (process.env.REMOTE_DB_URL) return createRemoteDb()
   const db = new PGlite({ extensions: { uuid_ossp, pgcrypto } })
   await db.exec(SUPABASE_STUBS)
   // Comme sur Supabase : les extensions vivent dans le schéma `extensions`, présent dans le search_path par défaut des sessions
@@ -64,4 +65,32 @@ export async function asService(db, fn) {
 export async function asAnon(db, fn) {
   await db.exec(`SET ROLE anon; SELECT set_config('request.jwt.claim.sub', '', false); SELECT set_config('request.jwt.claim.role', 'anon', false);`)
   try { return await fn() } finally { await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.role', '', false);`) }
+}
+
+// ------------------------------------------
+// Mode « base réelle » : REMOTE_DB_URL=postgres://… (Supabase déjà migré). Rien n'est jamais validé : tout s'exécute dans UNE transaction
+// que la fermeture de la connexion annule. Un point de sauvegarde par requête reproduit l'autocommit de pglite (une erreur attendue par un
+// test n'abîme pas la transaction). Les migrations ne sont PAS rejouées.
+// ------------------------------------------
+async function createRemoteDb() {
+  const { default: pg } = await import('pg')
+  const { default: utils } = await import('pg/lib/utils.js')
+  pg.types.setTypeParser(20, v => Number(v))            // int8 → nombre, comme pglite
+  const client = new pg.Client({ connectionString: process.env.REMOTE_DB_URL, ssl: { rejectUnauthorized: false } })
+  await client.connect()
+  client.connection.stream.unref()                      // la fin des tests ferme la connexion : le serveur annule alors la transaction
+  await client.query('BEGIN')
+  // Les paramètres sont inlinés (littéraux échappés par pg) pour tenir en UN aller-retour réseau par requête, savepoint compris.
+  const lit = v => (v === null || v === undefined ? 'NULL' : client.escapeLiteral(String(utils.prepareValue(v))))
+  let n = 0
+  const run = async (sql, params = []) => {
+    const sp = 'sp' + n++
+    const text = params.length ? sql.replace(/\$(\d+)/g, (_, i) => lit(params[i - 1])) : sql
+    try {
+      let r = await client.query('SAVEPOINT ' + sp + '; ' + text)
+      if (Array.isArray(r)) r = r[r.length - 1]
+      return r
+    } catch (e) { await client.query('ROLLBACK TO SAVEPOINT ' + sp).catch(() => {}); throw e }
+  }
+  return { query: run, exec: run, remote: true, close: () => client.end() }
 }

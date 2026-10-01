@@ -18,7 +18,8 @@
     "db:migrate": "supabase db push",
     "db:seed": "node supabase/seed/index.js",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > packages/db/src/types.ts"
+    "db:types": "supabase gen types typescript --local > packages/db/src/types.ts",
+    "test:db:remote": "node scripts/test-remote.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -27,6 +28,7 @@
     "ajv-draft-04": "^1.0.0",
     "ajv-formats": "^3.0.1",
     "dotenv": "^18.0.5",
+    "pg": "^8.23.1",
     "prettier": "^3.3.0",
     "turbo": "^2.3.0",
     "typescript": "^5.6.0",

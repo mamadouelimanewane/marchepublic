@@ -26,7 +26,7 @@ before(async () => {
   INST2 = (await q(`insert into institutions (code, name, type) values ('ACB', 'Hôpital bénéficiaire', 'ETAT') returning id`))[0].id
   const INST3 = (await q(`insert into institutions (code, name, type) values ('ACC', 'Autre autorité', 'ETAT') returning id`))[0].id
   await mkUser('prm', 'PRM', INST); await mkUser('cpm2', 'CPM', INST2); await mkUser('cpm3', 'CPM', INST3)
-  await mkUser('titulaire', 'SOUMISSIONNAIRE', null); await mkUser('autre', 'SOUMISSIONNAIRE', null)
+  await mkUser('dcmp', 'DCMP', null); await mkUser('titulaire', 'SOUMISSIONNAIRE', null); await mkUser('autre', 'SOUMISSIONNAIRE', null)
   INFO = (await q(`select id from corps_metiers where code='INFORMATIQUE'`))[0].id
   BUREAU = (await q(`select id from corps_metiers where code='FOURNITURES_BUREAU'`))[0].id
 
@@ -142,6 +142,7 @@ test('visibilité : catalogue et prix publics ; commandes confidentielles', asyn
 test('audit : créations et commandes tracées dans la chaîne', async () => {
   const n = (await q(`select count(*)::int n from audit_logs where entity_type in ('framework_agreements','catalog_items','call_off_orders')`))[0].n
   assert.ok(n >= 6, `journal trop court : ${n}`)
-  const [chain] = await q(`select (verify_audit_chain(null)).* `).catch(() => [{}])
-  assert.ok(chain !== undefined)
+  // verify_audit_chain ne renvoie que les maillons rompus : un résultat vide = chaîne intacte (vérification réservée aux régulateurs).
+  const broken = await as('dcmp', `select * from verify_audit_chain($1)`, [INST])
+  assert.deepEqual(broken, [])
 })
