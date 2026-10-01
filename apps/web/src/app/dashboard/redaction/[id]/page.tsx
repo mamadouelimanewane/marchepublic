@@ -9,6 +9,7 @@ import { ActionButton, ActionForm } from '@/components/ActionForm'
 import { DocumentEditor, type ClauseOption, type Section } from '@/components/DocumentEditor'
 import { WorkflowBadge } from '@/components/workflow/WorkflowBadge'
 import { tenderVariables } from '@/lib/redaction'
+import { aiStatus } from '../../actions/assistant'
 import { addDocumentComment, createDocument, setDocumentCircuit } from '../../actions/passation'
 
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,7 @@ export default async function RedactionTenderPage({ params }: { params: Promise<
   const clauseOptions: ClauseOption[] = (clauses.data ?? [])
     .filter(c => !c.natures || c.natures.includes(t.nature_marche)).map(c => ({ code: c.code, titre: c.titre, contenu: c.contenu, obligatoire: c.obligatoire, natures: c.natures }))
   const variables = await tenderVariables(supabase, id)
+  const ai = ['SERVICE_DEMANDEUR', 'CPM', 'PRM'].includes(session.role) ? await aiStatus() : { enabled: false, remaining: null }
   const lotsAdvice = !t.is_alloti && Number(t.montant_estime ?? 0) >= 2 * seuil && ['TRAVAUX', 'FOURNITURES'].includes(t.nature_marche)
 
   return (
@@ -89,7 +91,7 @@ export default async function RedactionTenderPage({ params }: { params: Promise<
               </span>
             )}>
             <DocumentEditor documentId={d.id} type={d.type as 'TDR' | 'DAO'} nature={t.nature_marche} ligneBudgetaire={t.ligne_budgetaire} initial={sections}
-              clauses={clauseOptions} variables={variables} readOnly={readOnly} />
+              clauses={clauseOptions} variables={variables} readOnly={readOnly} ai={ai} />
 
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
               <div>
