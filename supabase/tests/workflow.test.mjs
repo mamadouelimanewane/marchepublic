@@ -454,7 +454,7 @@ describe('Procédure infructueuse et relance', () => {
 })
 
 describe('Étanchéité : ce qu’un candidat étranger au marché peut lire', () => {
-  const ALLOWED = new Set(['config_seuils', 'corps_metiers', 'phase_transitions'])   // données de référence publiques
+  const ALLOWED = new Set(['config_seuils', 'corps_metiers', 'catalog_attribute_defs', 'phase_transitions'])   // données de référence publiques
   test('aucune table interne n’expose de ligne à un utilisateur sans lien avec les marchés', async () => {
     await mkUser('outsider', 'SOUMISSIONNAIRE', null)
     const tables = (await q(`select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','v') order by 1`)).map(r => r.relname)

@@ -59,6 +59,7 @@ La parité TypeScript ↔ SQL des transitions est vérifiée par `packages/workf
 - **Faible débit** : application installable (PWA) avec accès hors ligne aux seules pages publiques (jamais aux pages connectées), reprise automatique du téléversement des pièces.
 
 - **Historique des prestataires** : évaluation de fin de marché immuable, droit de réponse du prestataire (une réponse), historique consultable par l'autorité qui évalue ses offres, publication **en moyenne seulement, à partir de 3 évaluations** (`/transparence/prestataires`).
+- **Catalogue électronique d'accords-cadres** : le PRM ouvre un accord sur un marché `ACCORD_CADRE` contractualisé (plafond ≤ montant du contrat) ; le titulaire publie des articles décrits par des **attributs standardisés** (liste fermée par catégorie, aucun texte libre) ; hausses de prix plafonnées (10 %) et historisées ; les autorités commandent au prix figé, dans le plafond, avec restitution du solde en cas d'annulation (`/dashboard/catalogue`, public : `/transparence/catalogue`).
 
 ## Règles métier bloquantes (vérifiées par les tests)
 

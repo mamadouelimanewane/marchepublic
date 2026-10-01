@@ -64,6 +64,7 @@ export const ROUTE_ACCESS: Record<string, readonly Role[]> = {
   '/dashboard/pieces': ['ADMIN', 'DCMP'],
   '/dashboard/risques': ['DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN', 'PRM'],
   '/dashboard/signalements': ['DCMP', 'ARCOP', 'COUR_COMPTES'],
+  '/dashboard/catalogue': ['SERVICE_DEMANDEUR', 'CPM', 'PRM', 'SOUMISSIONNAIRE', 'DCMP', 'ARCOP', 'COUR_COMPTES'],
 }
 
 export function canAccessRoute(role: Role, pathname: string): boolean {
@@ -108,6 +109,7 @@ const NAV: { section: string; items: (NavItem & { roles?: readonly Role[] })[] }
     items: [
       { href: '/dashboard/execution', label: 'Contrats & exécution' },
       { href: '/dashboard/reception', label: 'Réception & paiements' },
+      { href: '/dashboard/catalogue', label: 'Catalogue accords-cadres' },
       { href: '/dashboard/archivage', label: 'Archivage' },
     ],
   },
