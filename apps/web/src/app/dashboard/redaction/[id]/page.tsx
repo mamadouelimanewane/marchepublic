@@ -37,8 +37,11 @@ export default async function RedactionTenderPage({ params }: { params: Promise<
   const editablePhase = t.current_phase === 'PHASE_1_PROGRAMMATION' || t.current_phase === 'PHASE_2_REDACTION'
   const instType = ((t.institutions as unknown as { type: string } | null)?.type ?? 'ETAT') as TypeInstitution
   const seuil = seuilAoo(instType, t.nature_marche)
+  // Modèles proposés : ceux du corps de métier du marché d'abord, puis (si le métier n'est pas renseigné) les autres modèles sectoriels, puis les génériques.
+  const rank = (x: { corps_metier_id: string | null }) => (x.corps_metier_id && x.corps_metier_id === t.corps_metier_id ? 0 : x.corps_metier_id ? 1 : 2)
   const suggestedTemplates = (templates.data ?? []).filter(x =>
-    (!x.nature_marche || x.nature_marche === t.nature_marche) && (!x.corps_metier_id || x.corps_metier_id === t.corps_metier_id) && (!x.mode_passation || x.mode_passation === t.mode_passation))
+    (!x.nature_marche || x.nature_marche === t.nature_marche) && (!x.corps_metier_id || !t.corps_metier_id || x.corps_metier_id === t.corps_metier_id) && (!x.mode_passation || x.mode_passation === t.mode_passation))
+    .sort((a, b) => rank(a) - rank(b) || a.titre.localeCompare(b.titre, 'fr'))
   const clauseOptions: ClauseOption[] = (clauses.data ?? [])
     .filter(c => !c.natures || c.natures.includes(t.nature_marche)).map(c => ({ code: c.code, titre: c.titre, contenu: c.contenu, obligatoire: c.obligatoire, natures: c.natures }))
   const variables = await tenderVariables(supabase, id)
