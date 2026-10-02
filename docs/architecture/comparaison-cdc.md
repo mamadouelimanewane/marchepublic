@@ -199,8 +199,8 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 ### Décompte (68 lignes évaluées de la partie B)
 | État | Nombre |
 |---|---|
-| ✅ Conforme | 46 |
-| 🟡 Partiel ou non éprouvé | 11 |
+| ✅ Conforme | 47 |
+| 🟡 Partiel ou non éprouvé | 10 |
 | ⛔ Non réalisé | 11 |
 
 ### Les écarts qui comptent le plus, par ordre de priorité
@@ -216,3 +216,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 
 ### Ce que l'application fait en plus du cahier des charges
 Données ouvertes OCDS, alertes de risque, signalements citoyens, ancrage du journal d'audit, dossier permanent et alertes d'appels d'offres pour les PME, historique de performance des prestataires, catalogue d'accords-cadres, partage de la clé d'ouverture (Shamir), procédure infructueuse, allotissement complet, aide à la rédaction et assistant IA.
+
+### Dépendances : état de l'audit de sécurité (`npm audit`)
+Sept alertes subsistent, toutes dans l'outillage de développement ou de compilation, jamais dans le code qui traite des données d'utilisateurs :
+`vitest` (« critique », uniquement lorsque son interface web de développement est lancée, ce qui n'est jamais le cas), `vite`, `esbuild`, `vite-node`, `@vitest/mocker`, et `postcss` embarqué par `next` (traitement de CSS contrôlé par un attaquant à la compilation). Leur correction passe par des montées de version majeures (vitest 5, next 16) à planifier avec les tests de non-régression. Corrigées : `nodemailer` (6 → 10) et `sharp` (dépendance inutile retirée).
