@@ -103,3 +103,17 @@ export async function markNotificationsRead(): Promise<ActionResult> {
     return ok('Notifications marquées comme lues')
   })
 }
+
+const MODES = ['AOO', 'AOR', 'AOO_2ETAPES', 'CONCOURS', 'DRP', 'ENTENTE_DIRECTE', 'ACCORD_CADRE'] as const
+
+/** Type de séance d'ouverture par mode de passation : publique (lecture des offres aux candidats) ou restreinte. N'affecte pas les ouvertures déjà enregistrées. */
+export async function setRegleOuverture(mode: string, publique: boolean): Promise<ActionResult> {
+  return guarded(async session => {
+    requireAdmin(session.role)
+    const m = parse(z.enum(MODES), mode)
+    const supabase = await db()
+    check(await supabase.from('regles_ouverture').update({ publique }).eq('mode', m))
+    refresh()
+    return ok(`Mode ${m} : séance ${publique ? 'publique' : 'restreinte'} pour les prochaines ouvertures`)
+  })
+}

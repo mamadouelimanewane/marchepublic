@@ -185,6 +185,20 @@ export async function signOpening(tenderId: string, observations?: string): Prom
   })
 }
 
+/** Registre de présence de la séance d'ouverture (CPM/PRM, avant la signature). */
+export async function recordAttendance(tenderId: string, fd: FormData): Promise<ActionResult> {
+  return guarded(async () => {
+    const v = parse(z.object({
+      nom: z.string().trim().min(3, 'Nom : 3 caractères minimum').max(120),
+      qualite: z.enum(['CANDIDAT', 'OBSERVATEUR', 'AUTORITE', 'AUTRE']),
+      organisme: z.string().trim().max(160).optional(),
+    }), fd)
+    await rpc('record_attendance', { p_tender: tenderId, p_nom: v.nom, p_qualite: v.qualite, p_organisme: v.organisme || null })
+    refresh()
+    return ok('Présence enregistrée au registre de la séance')
+  })
+}
+
 export async function recordConformite(fd: FormData): Promise<ActionResult> {
   return guarded(async () => {
     const raw = formDataToObject(fd)

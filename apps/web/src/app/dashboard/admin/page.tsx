@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { dateFr } from '@/lib/format'
 import { Alert, Badge, Card, DataTable, Field, Grid, PageHeader } from '@/components/ui'
 import { ActionButton, ActionForm } from '@/components/ActionForm'
-import { createInstitution, createStaffUser, setSupplierStatus, setUserActive, toggleCorpsMetier, updateConfig } from '../actions/admin'
+import { createInstitution, createStaffUser, setSupplierStatus, setUserActive, setRegleOuverture, toggleCorpsMetier, updateConfig } from '../actions/admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,11 +13,12 @@ const STAFF_ROLES: Role[] = ['SERVICE_DEMANDEUR', 'CPM', 'PRM', 'EVALUATEUR', 'T
 export default async function AdminPage() {
   await requireRole(['ADMIN'])
   const supabase = await createSupabaseServerClient()
-  const [config, institutions, users, corps] = await Promise.all([
+  const [config, institutions, users, corps, regles] = await Promise.all([
     supabase.from('config_seuils').select('cle, valeur, description, modifie_le').order('cle'),
     supabase.from('institutions').select('id, code, name, type, is_active').order('name'),
     supabase.from('users').select('id, full_name, email, role, institution_id, is_active, is_pme, is_pme_feminine, is_ess, ninea, ninea_verified_at, institutions(name)').order('created_at', { ascending: false }).limit(200),
     supabase.from('corps_metiers').select('id, code, libelle, is_active').order('libelle'),
+    supabase.from('regles_ouverture').select('mode, publique, note').order('mode'),
   ])
   const suppliers = (users.data ?? []).filter(u => u.role === 'SOUMISSIONNAIRE')
   const staff = (users.data ?? []).filter(u => u.role !== 'SOUMISSIONNAIRE')
@@ -56,6 +57,16 @@ export default async function AdminPage() {
           ]} />
         </Card>
       </div>
+
+      <Card title="Séance d'ouverture des plis par mode de passation" subtitle="Publique : les candidats ayant déposé prennent connaissance de la lecture des offres dès l'ouverture. Restreinte : rien n'est communiqué avant l'attribution. Valeurs de départ à confirmer avec la DCMP ; sans effet sur les ouvertures déjà enregistrées." padded={false}>
+        <DataTable rows={regles.data} rowKey={r => r.mode} empty="Aucune règle."
+          columns={[
+            { header: 'Mode', cell: r => <strong>{r.mode}</strong> },
+            { header: 'Note', cell: r => <span className="text-xs text-gray-500">{r.note}</span> },
+            { header: 'Séance', cell: r => <Badge tone={r.publique ? 'blue' : 'gray'}>{r.publique ? 'Publique' : 'Restreinte'}</Badge> },
+            { header: '', cell: r => <ActionButton label={r.publique ? 'Passer en restreinte' : 'Passer en publique'} variant="secondary" action={setRegleOuverture.bind(null, r.mode, !r.publique)} confirm="Modifier le type de séance pour les prochaines ouvertures de ce mode ?" /> },
+          ]} />
+      </Card>
 
       <Card title="Comptes institutionnels" subtitle="Création par invitation e-mail : aucun mot de passe n'est communiqué. Le rôle et l'institution sont attribués ici uniquement." padded={false}>
         <DataTable rows={staff} rowKey={u => u.id} columns={[

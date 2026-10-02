@@ -10,7 +10,9 @@ import { EvaluationGrid } from '@/components/EvaluationGrid'
 import { OpeningPanel } from '@/components/OpeningPanel'
 import { WorkflowBadge } from '@/components/workflow/WorkflowBadge'
 import { advancePhase, declareInfructueux } from '../../actions/marches'
-import { recordConformite, signOpening } from '../../actions/passation'
+import { recordAttendance, recordConformite, signOpening } from '../../actions/passation'
+
+const QUALITE: Record<string, string> = { CANDIDAT: 'Candidat', OBSERVATEUR: 'Observateur', AUTORITE: 'Autorité', AUTRE: 'Autre' }
 
 export const dynamic = 'force-dynamic'
 
@@ -20,8 +22,15 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
   const supabase = await createSupabaseServerClient()
 
   const { data: t } = await supabase.from('tenders')
-    .select('id, reference, title, current_phase, date_limite_depot, criteres_evaluation, evaluation_round, nature_marche, bid_key_shares, bid_key_threshold').eq('id', id).maybeSingle()
+    .select('id, reference, title, current_phase, date_limite_depot, criteres_evaluation, evaluation_round, nature_marche, mode_passation, bid_key_shares, bid_key_threshold').eq('id', id).maybeSingle()
   if (!t) notFound()
+  const [regle, ouverture, presence] = await Promise.all([
+    supabase.from('regles_ouverture').select('publique').eq('mode', t.mode_passation ?? 'AOO').maybeSingle(),
+    supabase.from('bid_openings').select('seance_publique').eq('tender_id', id).maybeSingle(),
+    supabase.from('opening_attendance').select('id, nom, qualite, organisme').eq('tender_id', id).order('created_at'),
+  ])
+  // Avant l'ouverture : type prévu par la règle du mode de passation ; après : type enregistré (immuable).
+  const seancePublique = ouverture.data ? ouverture.data.seance_publique : Boolean(regle.data?.publique)
   const n = phaseNumber(t.current_phase)
   const criteres = (t.criteres_evaluation ?? []) as { critere: string; ponderation: number }[]
 
@@ -68,6 +77,25 @@ export default async function EvaluationTenderPage({ params }: { params: Promise
       {/* ---------- Ouverture ---------- */}
       {n >= 7 && (
         <Card title="1. Ouverture officielle des plis" subtitle="Règle des deux personnes : le CPM et le président de la commission signent chacun.">
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+            <p className="flex flex-wrap items-center gap-2">
+              <Badge tone={seancePublique ? 'blue' : 'gray'}>{seancePublique ? 'Séance publique' : 'Séance restreinte'}</Badge>
+              <span className="text-gray-600">{seancePublique
+                ? 'Dès l\'ouverture, les candidats ayant déposé une offre dans les délais prennent connaissance de la lecture des offres (candidats, montants lus, conformité).'
+                : 'Aucune lecture des offres n\'est communiquée aux candidats avant l\'attribution.'}</span>
+            </p>
+            <h3 className="mb-1 mt-3 font-semibold text-gray-700">Registre de présence</h3>
+            {(presence.data ?? []).length > 0
+              ? <ul className="list-disc pl-5">{presence.data!.map(p => <li key={p.id}>{p.nom} — {QUALITE[p.qualite] ?? p.qualite}{p.organisme ? ` (${p.organisme})` : ''}</li>)}</ul>
+              : <p className="text-gray-500">Aucune présence enregistrée.</p>}
+            {t.current_phase === 'PHASE_7_OUVERTURE_PLIS' && (session.role === 'CPM' || session.role === 'PRM') && !ouverture.data && (
+              <ActionForm action={recordAttendance.bind(null, id)} submitLabel="Ajouter au registre" variant="secondary" className="mt-3 grid gap-3 sm:grid-cols-4 sm:items-end">
+                <Field label="Nom et prénom" name="nom" required />
+                <Field label="Qualité" name="qualite" required options={Object.entries(QUALITE).map(([value, label]) => ({ value, label }))} />
+                <Field label="Organisme (facultatif)" name="organisme" />
+              </ActionForm>
+            )}
+          </div>
           <ul className="mb-4 space-y-1 text-sm">
             <li>CPM : {hasSigned('CPM') ? <Badge tone="green">Signé</Badge> : <Badge tone="amber">En attente</Badge>}</li>
             <li>Président de la commission : {hasSigned('PRESIDENT') ? <Badge tone="green">Signé</Badge> : <Badge tone="amber">En attente</Badge>}</li>

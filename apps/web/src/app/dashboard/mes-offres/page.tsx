@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { phaseNumber } from '@marchepublic/workflow'
 import { requireSession } from '@/lib/auth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { dateFr, fcfa } from '@/lib/format'
@@ -26,12 +27,15 @@ export default async function MesOffresPage() {
             { header: 'Déposée le', cell: (b: any) => dateFr(b.submitted_at, true) },
             { header: 'Mon offre', cell: (b: any) => <Badge tone={b.status === 'PROVISOIREMENT_RETENUE' || b.status === 'RETENUE_DEFINITIVE' ? 'green' : b.status === 'RETARDEE' || b.status === 'REJETEE' || b.status === 'NON_CONFORME' ? 'red' : 'blue'}>{b.status}</Badge> },
             { header: 'Classement', cell: (b: any) => rk.get(b.id) ? `${rk.get(b.id)!.qualifie ? `Rang ${rk.get(b.id)!.rang}` : 'Éliminée'} — ${rk.get(b.id)!.score_global ?? '—'} pts` : '—' },
-            { header: 'Phase du marché', cell: (b: any) => b.tenders ? <WorkflowBadge phase={b.tenders.current_phase} /> : '—' },
+            { header: 'Phase du marché', cell: (b: any) => b.tenders ? (
+              <div className="space-y-1"><WorkflowBadge phase={b.tenders.current_phase} />
+                {phaseNumber(b.tenders.current_phase) >= 8 && <div><Link className="text-xs font-medium text-green-700 hover:underline" href={`/dashboard/lecture-offres/${b.tenders.id}`}>Lecture des offres →</Link></div>}
+              </div>) : '—' },
             { header: 'Recours', cell: (b: any) => b.tenders?.current_phase === 'PHASE_10_RECOURS' && b.status !== 'PROVISOIREMENT_RETENUE'
               ? <Link className="text-xs font-semibold text-red-700 hover:underline" href={`/dashboard/recours/${b.tenders.id}`}>Délai jusqu'au {dateFr(b.tenders.date_fin_recours)} →</Link> : '—' },
           ]} />
       </Card>
-      <p className="text-xs text-gray-400">Montants et classement ne sont communiqués qu'après l'attribution provisoire.</p>
+      <p className="text-xs text-gray-400">Le classement n'est communiqué qu'après l'attribution provisoire ; la lecture des offres n'est communiquée dès l'ouverture que pour une séance publique.</p>
     </div>
   )
 }

@@ -41,15 +41,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ kin
     model = documentModel(tenderInfo(t), { titre: d.titre, type: d.type, circuit_statut: d.circuit_statut, sections: (d.contenu as Row)?.sections ?? [] }, (v ?? []) as never[])
   } else if (kind === 'pv-ouverture') {
     const { data: t } = await supabase.from('tenders').select(tenderCols).eq('id', id).maybeSingle()
-    const { data: o } = await supabase.from('bid_openings').select('opened_at, nb_plis, key_fingerprint, observations').eq('tender_id', id).maybeSingle()
+    const { data: o } = await supabase.from('bid_openings').select('opened_at, nb_plis, key_fingerprint, observations, seance_publique').eq('tender_id', id).maybeSingle()
     if (!t || !o) return notFound()
-    const [{ data: members }, { data: bids }] = await Promise.all([
+    const [{ data: members }, { data: bids }, { data: presents }] = await Promise.all([
       supabase.from('commission_members').select('role_commission, users(full_name)').eq('tender_id', id),
       supabase.from('bids').select('status, montant_offre, submitted_at, motif_non_conformite, lots:lot_id(numero_lot), users:soumissionnaire_id(full_name, ninea)').eq('tender_id', id).order('submitted_at'),
+      supabase.from('opening_attendance').select('nom, qualite, organisme').eq('tender_id', id).order('created_at'),
     ])
     model = pvOuvertureModel({ ...tenderInfo(t), date_limite_depot: t.date_limite_depot }, o,
       (members ?? []).map((m: Row) => ({ nom: m.users?.full_name ?? '-', fonction: m.role_commission })),
-      (bids ?? []).map((b: Row) => ({ candidat: b.users?.full_name ?? 'Candidat', ninea: b.users?.ninea ?? null, lot: b.lots ? `Lot ${b.lots.numero_lot}` : null, recu: b.submitted_at, montant: b.montant_offre, statut: b.status, motif: b.motif_non_conformite })))
+      (bids ?? []).map((b: Row) => ({ candidat: b.users?.full_name ?? 'Candidat', ninea: b.users?.ninea ?? null, lot: b.lots ? `Lot ${b.lots.numero_lot}` : null, recu: b.submitted_at, montant: b.montant_offre, statut: b.status, motif: b.motif_non_conformite })),
+      { publique: !!o.seance_publique, presents: (presents ?? []).map((p: Row) => ({ nom: p.nom, qualite: p.qualite, organisme: p.organisme ?? null })) })
   } else if (kind === 'rapport-evaluation') {
     const { data: t } = await supabase.from('tenders').select(tenderCols).eq('id', id).maybeSingle()
     if (!t) return notFound()

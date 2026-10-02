@@ -211,7 +211,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 5. **Test d'intrusion et test de charge** (⛔) : exigés par les critères de recette.
 6. **Interconnexions** (⛔/🟡) : SIGFIP, ADIE, portail national, DGID, mobile money — chacune exige un accès ou une spécification que seules ces institutions fournissent.
 7. **Documentation et formation** (⛔) : spécifications détaillées, manuels, plan de formation.
-8. **Écarts de périmètre réalisables sans tiers** : procédure propre aux DSP/PPP, distinction ouverture publique/restreinte.
+8. **Écarts de périmètre réalisables sans tiers** : procédure propre aux DSP/PPP.
 9. **Application mobile native (Capacitor)** : la PWA couvre l'essentiel du besoin ; la version native reste à décider.
 
 ### Ce que l'application fait en plus du cahier des charges

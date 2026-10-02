@@ -64,7 +64,8 @@ export const ROUTE_ACCESS: Record<string, readonly Role[]> = {
   '/dashboard/pieces': ['ADMIN', 'DCMP'],
   '/dashboard/risques': ['DCMP', 'ARCOP', 'COUR_COMPTES', 'ADMIN', 'PRM'],
   '/dashboard/signalements': ['DCMP', 'ARCOP', 'COUR_COMPTES'],
-  '/dashboard/catalogue': ['SERVICE_DEMANDEUR', 'CPM', 'PRM', 'SOUMISSIONNAIRE', 'DCMP', 'ARCOP', 'COUR_COMPTES'],
+  '/dashboard/lecture-offres': ['SOUMISSIONNAIRE', 'CPM', 'PRM', 'EVALUATEUR', 'DCMP', 'ARCOP', 'COUR_COMPTES'],
+  '/dashboard/catalogue':['SERVICE_DEMANDEUR', 'CPM', 'PRM', 'SOUMISSIONNAIRE', 'DCMP', 'ARCOP', 'COUR_COMPTES'],
 }
 
 export function canAccessRoute(role: Role, pathname: string): boolean {

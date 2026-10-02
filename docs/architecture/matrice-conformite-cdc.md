@@ -123,3 +123,11 @@ Positionnement : la plateforme nationale APPEL (ARCOP, octobre 2025) existe ; ce
 | Aide à la rédaction TDR/DAO (variables, guides, contrôle qualité, validation conditionnée) | ✅ | `0019` : `document_blocking_issues` + garde du circuit ; `domain/redaction.ts` (linter, parité testée) | `redaction.test.ts`, `redaction-parity.test.ts`, `workflow.test.mjs` |
 | Assistant IA de rédaction (proposition + relecture) | ✅ | `0020` : `claim_ai_request` (droits, verrouillage, quota), journal `ai_requests` ; prompts à saisies délimitées | `assistant.test.mjs`, `ai.test.ts` |
 | Modèles de TDR sectoriels (43 corps de métiers + 4 génériques) et TDR complet par IA | ✅ | `0021` générée depuis `supabase/modeles-tdr/` ; `draftTdrBatch` ; journal `REDIGER_TDR_COMPLET` | `modeles.test.mjs`, `ai.test.ts` |
+
+## Séance d'ouverture publique ou restreinte (CDC §5 phase 7)
+
+| Exigence | État | Mise en œuvre | Test |
+|---|---|---|---|
+| Séance publique ou restreinte selon la procédure | ✅ (valeurs de départ à confirmer avec la DCMP) | `regles_ouverture` (AOO, AOO en deux étapes, concours = publique ; modifiable par l'administrateur) ; type figé dans `bid_openings.seance_publique` | `ouverture.test.mjs` |
+| Registre de présence | ✅ | `record_attendance` (CPM/PRM, phase 7, avant la signature), immuable, repris dans le PV | idem |
+| Lecture des offres communiquée aux candidats (séance publique) | ✅ | `v_lecture_ouverture` : candidats ayant déposé dans les délais et personnel habilité ; offres tardives exclues ; rien en séance restreinte ni pour les tiers | idem + test d'étanchéité |

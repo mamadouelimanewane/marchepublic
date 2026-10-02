@@ -5,6 +5,7 @@ import type { PdfModel } from '@/lib/pdf'
 interface TenderInfo { reference: string | null; title: string; institution: string; nature_marche?: string; mode_passation?: string | null; montant_estime?: number | null; montant_attribue?: number | null }
 
 const ref = (t: TenderInfo) => t.reference ?? 'marché'
+const QUALITE: Record<string, string> = { CANDIDAT: 'candidat', OBSERVATEUR: 'observateur', AUTORITE: 'autorité', AUTRE: 'autre' }
 
 export function documentModel(t: TenderInfo, doc: { titre: string; type: string; circuit_statut: string; sections: { titre: string; contenu: string }[] }, versions: { version: number; circuit_statut: string; content_hash: string; created_at: string }[]): PdfModel {
   const last = versions[0]
@@ -18,12 +19,13 @@ export function documentModel(t: TenderInfo, doc: { titre: string; type: string;
   }
 }
 
-export function pvOuvertureModel(t: TenderInfo & { date_limite_depot: string | null }, opening: { opened_at: string; nb_plis: number; key_fingerprint: string | null; observations: string | null }, commission: { nom: string; fonction: string }[], bids: { candidat: string; ninea: string | null; lot: string | null; recu: string | null; montant: number | null; statut: string; motif: string | null }[]): PdfModel {
+export function pvOuvertureModel(t: TenderInfo & { date_limite_depot: string | null }, opening: { opened_at: string; nb_plis: number; key_fingerprint: string | null; observations: string | null }, commission: { nom: string; fonction: string }[], bids: { candidat: string; ninea: string | null; lot: string | null; recu: string | null; montant: number | null; statut: string; motif: string | null }[], seance?: { publique: boolean; presents: { nom: string; qualite: string; organisme: string | null }[] }): PdfModel {
   return {
     title: "Procès-verbal d'ouverture des plis", subtitle: t.institution, reference: `${ref(t)} / PV ouverture`,
     blocks: [
-      { t: 'kv', rows: [['Marché', `${ref(t)} — ${t.title}`], ['Date limite de dépôt', dateFr(t.date_limite_depot, true)], ['Ouverture effective', dateFr(opening.opened_at, true)], ['Plis reçus dans les délais', String(opening.nb_plis)], ['Empreinte clé publique', opening.key_fingerprint ?? '-']] },
+      { t: 'kv', rows: [['Marché', `${ref(t)} — ${t.title}`], ['Date limite de dépôt', dateFr(t.date_limite_depot, true)], ['Ouverture effective', dateFr(opening.opened_at, true)], ['Plis reçus dans les délais', String(opening.nb_plis)], ['Empreinte clé publique', opening.key_fingerprint ?? '-'], ...(seance ? [['Type de séance', seance.publique ? 'Séance publique' : 'Séance restreinte'] as [string, string]] : [])] },
       { t: 'h2', text: 'Commission' }, { t: 'list', items: commission.map(c => `${c.nom} — ${c.fonction}`) },
+      ...(seance ? [{ t: 'h2' as const, text: 'Registre de présence' }, seance.presents.length ? { t: 'list' as const, items: seance.presents.map(p => `${p.nom} - ${QUALITE[p.qualite] ?? p.qualite}${p.organisme ? ` (${p.organisme})` : ''}`) } : { t: 'p' as const, text: 'Aucune présence enregistrée au registre.' }] : []),
       { t: 'h2', text: 'Offres' },
       { t: 'table', head: ['Candidat', 'NINEA', 'Lot', 'Reçue le', 'Montant lu', 'Statut'], widths: [3, 1.5, 0.8, 1.7, 1.7, 2],
         rows: bids.map(b => [b.candidat, b.ninea ?? '-', b.lot ?? '-', dateFr(b.recu, true), fcfa(b.montant), b.motif ? `${b.statut} - ${b.motif}` : b.statut]) },
