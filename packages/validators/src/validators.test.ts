@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  amendmentSchema, appealDecisionSchema, bidSubmissionSchema, criteresSchema, formatZodError, registerSchema, reviewSchema, tenderSchema,
+  amendmentSchema, appealDecisionSchema, bidSubmissionSchema, criteresSchema, formatZodError, registerSchema, sectionsSchema, reviewSchema, tenderSchema,
 } from './index'
 
 const uuid = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
@@ -47,5 +47,16 @@ describe('schémas', () => {
     expect(tenderSchema.safeParse(base).success).toBe(true)
     expect(tenderSchema.safeParse({ ...base, title: 'Court' }).success).toBe(false)
     expect(tenderSchema.safeParse({ ...base, ppm_trimestre: 5 }).success).toBe(false)
+  })
+})
+
+describe('sectionsSchema : sections de modèle sectoriel', () => {
+  const guide = { objectif: 'Objectif', points: ['Point'], exemple: 'Exemple', erreurs: ['Erreur'] }
+  it('accepte consigne et guide propres au métier', () => {
+    expect(sectionsSchema.safeParse([{ id: 'consistance', titre: '3. Consistance', contenu: '', obligatoire: true, consigne: 'Décrire', guide }]).success).toBe(true)
+  })
+  it('refuse un guide incomplet ou démesuré', () => {
+    expect(sectionsSchema.safeParse([{ id: 'a', titre: 'T', contenu: '', guide: { objectif: 'x' } }]).success).toBe(false)
+    expect(sectionsSchema.safeParse([{ id: 'a', titre: 'T', contenu: '', guide: { ...guide, points: Array.from({ length: 31 }, () => 'p') } }]).success).toBe(false)
   })
 })

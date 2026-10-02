@@ -23,7 +23,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 - Plan de passation annuel, export CSV, alerte de retard par rapport au calendrier prévisionnel.
 
 ### A3. Rédaction des TDR / DAO (phase 2)
-- Bibliothèque : 12 modèles de TDR (un par corps de métier), modèles de DAO par mode de passation, 12 clauses types, grilles d'évaluation types par corps de métier.
+- Bibliothèque : 43 modèles de TDR sectoriels (un par corps de métier) et 4 modèles génériques, modèles de DAO par mode de passation, 12 clauses types, grilles d'évaluation types par corps de métier.
 - Calcul automatique du mode de passation selon montant, nature et type d'entité ; justification obligatoire si l'on s'écarte du mode réglementaire ; DRP refusée au-delà du seuil.
 - Alerte d'allotissement recommandé.
 - Circuit rédaction → relecture CPM → validation PRM ; versions immuables avec empreinte ; commentaires ; verrouillage à la transmission à la DCMP.

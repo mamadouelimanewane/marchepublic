@@ -13,6 +13,7 @@ import { aiStatus } from '../../actions/assistant'
 import { addDocumentComment, createDocument, setDocumentCircuit } from '../../actions/passation'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120   // la rédaction par IA peut durer plus longtemps qu'une action ordinaire
 
 const CIRCUIT_TONE = { REDACTION: 'gray', RELECTURE_CPM: 'amber', VALIDE_PRM: 'green', TRANSMIS_DCMP: 'blue', PUBLIE: 'teal' } as const
 
@@ -26,7 +27,7 @@ export default async function RedactionTenderPage({ params }: { params: Promise<
   if (!t) notFound()
 
   const [docs, templates, clauses, versions, comments] = await Promise.all([
-    supabase.from('tender_documents').select('id, titre, type, contenu, circuit_statut, is_locked').eq('tender_id', id).in('type', ['TDR', 'DAO']).order('created_at'),
+    supabase.from('tender_documents').select('id, titre, type, contenu, circuit_statut, is_locked, document_templates(meta)').eq('tender_id', id).in('type', ['TDR', 'DAO']).order('created_at'),
     supabase.from('document_templates').select('id, titre, type, nature_marche, corps_metier_id, mode_passation').eq('is_active', true),
     supabase.from('clause_templates').select('code, titre, contenu, obligatoire, natures').eq('is_active', true),
     supabase.from('document_versions').select('document_id, version, circuit_statut, content_hash, created_at, author_id').eq('tender_id', id).order('version', { ascending: false }),
@@ -91,7 +92,8 @@ export default async function RedactionTenderPage({ params }: { params: Promise<
               </span>
             )}>
             <DocumentEditor documentId={d.id} type={d.type as 'TDR' | 'DAO'} nature={t.nature_marche} ligneBudgetaire={t.ligne_budgetaire} initial={sections}
-              clauses={clauseOptions} variables={variables} readOnly={readOnly} ai={ai} />
+              clauses={clauseOptions} variables={variables} readOnly={readOnly} ai={ai}
+              questions={((d as any).document_templates?.meta?.questions as string[] | undefined) ?? []} />
 
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
               <div>

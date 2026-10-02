@@ -60,3 +60,61 @@ export function reviewPrompt(a: { type: 'TDR' | 'DAO'; nature: string; variables
 Format strict, une ligne par problème : « - [identifiant de section] Problème → Correction proposée ». Si le document est satisfaisant, réponds « Aucun problème majeur relevé. » Ne réécris pas le document.`,
   ].join('\n\n')
 }
+
+// ------------------------------------------
+// TDR complet : rédaction par lots de sections, réponse structurée en JSON
+// ------------------------------------------
+export interface CibleSection { id: string; titre: string; consigne?: string; points?: string[]; contenuActuel?: string }
+export interface Cadrage { question: string; reponse: string }
+
+export const MAX_SECTIONS_PAR_LOT = 4
+
+export function fullTdrPrompt(a: {
+  nature: string; variables: VariableValues; sections: CibleSection[]; cadrage: Cadrage[]; notes?: string
+  metier?: { references?: string[]; vigilance?: string[] }
+}): string {
+  const reponses = a.cadrage.filter(c => c.reponse.trim()).map(c => `Q : ${clean(c.question, 300)}\nR : ${clean(c.reponse, 1_000)}`).join('\n\n')
+  const cibles = a.sections.slice(0, MAX_SECTIONS_PAR_LOT).map(s => {
+    const actuel = clean(s.contenuActuel, 2_500)
+    return [`[${clean(s.id, 60)}] ${clean(s.titre, 200)}`,
+      s.consigne ? `Consigne : ${clean(s.consigne, 600)}` : '',
+      s.points?.length ? `Points à couvrir : ${s.points.slice(0, 12).map(p => clean(p, 200)).join(' ; ')}` : '',
+      actuel ? `Contenu actuel (à améliorer, conserver ce qui est juste) :\n${actuel}` : 'Section à rédiger entièrement.'].filter(Boolean).join('\n')
+  }).join('\n\n---\n\n')
+  const metier = a.metier ? [
+    a.metier.vigilance?.length ? `Points de vigilance propres au métier : ${a.metier.vigilance.map(v => clean(v, 200)).join(' ; ')}` : '',
+    a.metier.references?.length ? `Références usuelles du secteur (à ne citer que comme pistes à confirmer, sans inventer de numéro de texte) : ${a.metier.references.map(v => clean(v, 250)).join(' ; ')}` : '',
+  ].filter(Boolean).join('\n') : ''
+  return [
+    'Rédige les sections suivantes d\'un TDR complet, en cohérence entre elles et avec le cadrage de l\'agent.',
+    `<marche>\n${marche(a.variables, a.nature, 'TDR')}\n</marche>`,
+    reponses ? `<notes_agent>\nCadrage de l'agent :\n${reponses}${a.notes?.trim() ? `\n\nPrécisions : ${clean(a.notes, LIMITS.notes)}` : ''}\n</notes_agent>` : a.notes?.trim() ? `<notes_agent>\n${clean(a.notes, LIMITS.notes)}\n</notes_agent>` : '',
+    metier,
+    `<document>\n${cibles}\n</document>`,
+    `Contraintes : n'utilise aucune variable entre accolades ; écris en toutes lettres le contenu de chaque section ; mets [●] pour toute valeur inconnue (quantité, délai, montant, nom) ; reste mesurable et neutre.
+Réponds par UN SEUL objet JSON, sans texte autour ni balises de code : {"sections":[{"id":"<identifiant>","contenu":"<texte de la section>"}]} avec exactement les identifiants demandés, dans le même ordre. Les retours à la ligne dans « contenu » sont échappés selon la syntaxe JSON.`,
+  ].filter(Boolean).join('\n\n')
+}
+
+/** Extrait {id, contenu}[] de la réponse du modèle : tolère les balises de code et un texte autour ; ignore les identifiants non demandés. */
+export function parseSectionsJson(text: string, allowedIds: string[]): { id: string; contenu: string }[] {
+  const cleaned = text.replace(/```(?:json)?/gi, '')
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start < 0 || end <= start) throw new Error('Réponse illisible : réessayez.')
+  let data: unknown
+  try { data = JSON.parse(cleaned.slice(start, end + 1)) } catch { throw new Error('Réponse illisible : réessayez.') }
+  const list = (data as { sections?: unknown })?.sections
+  if (!Array.isArray(list)) throw new Error('Réponse illisible : réessayez.')
+  const allowed = new Set(allowedIds)
+  const seen = new Set<string>()
+  const out: { id: string; contenu: string }[] = []
+  for (const x of list) {
+    const id = (x as { id?: unknown })?.id, contenu = (x as { contenu?: unknown })?.contenu
+    if (typeof id !== 'string' || typeof contenu !== 'string' || !allowed.has(id) || seen.has(id) || !contenu.trim()) continue
+    seen.add(id)
+    out.push({ id, contenu: contenu.replace(/\{\{[^}]*\}\}/g, '[●]').trim().slice(0, 8_000) })
+  }
+  if (!out.length) throw new Error('Aucune section exploitable dans la réponse : réessayez.')
+  return out
+}

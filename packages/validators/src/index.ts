@@ -112,6 +112,12 @@ export const sectionsSchema = z.array(z.object({
   contenu: z.string().max(100_000),
   obligatoire: z.boolean().optional(),
   consigne: z.string().max(5_000).optional(),
+  guide: z.object({
+    objectif: z.string().max(1_000),
+    points: z.array(z.string().max(500)).max(30),
+    exemple: z.string().max(3_000),
+    erreurs: z.array(z.string().max(500)).max(20),
+  }).optional(),
 }))
 
 export const reviewSchema = z.object({

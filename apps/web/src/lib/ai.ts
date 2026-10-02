@@ -6,7 +6,7 @@ export const aiEnabled = () => Boolean(process.env.ANTHROPIC_API_KEY?.trim())
 export class AiError extends Error {}
 
 /** Appel minimal à l'API Messages d'Anthropic (sans SDK) : un tour, texte seul. */
-export async function askClaude(opts: { system: string; user: string; maxTokens?: number; fetchImpl?: typeof fetch }): Promise<string> {
+export async function askClaude(opts: { system: string; user: string; maxTokens?: number; timeoutMs?: number; fetchImpl?: typeof fetch }): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY?.trim()
   if (!key) throw new AiError('Assistant IA non configuré.')
   let res: Response
@@ -15,7 +15,7 @@ export async function askClaude(opts: { system: string; user: string; maxTokens?
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: aiModel(), max_tokens: opts.maxTokens ?? 1500, system: opts.system, messages: [{ role: 'user', content: opts.user }] }),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
     })
   } catch {
     throw new AiError('Le service d\'assistance ne répond pas. Réessayez dans un instant.')

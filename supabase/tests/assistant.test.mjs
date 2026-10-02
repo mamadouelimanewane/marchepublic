@@ -73,3 +73,10 @@ test('lecture : chacun ne voit que ses requêtes', async () => {
   assert.equal((await as('bidder', `select * from ai_requests`)).length, 0)
   await rejects(as('cpm', `update ai_requests set statut='OK'`), /permission|denied/i)
 })
+
+test('journal : le type « TDR complet » est accepté, tout autre type est refusé', async () => {
+  await q(`update config_seuils set valeur='30' where cle='AI_QUOTA_JOUR'`)
+  const [{ id }] = await as('cpm', `select claim_ai_request($1, 'REDIGER_TDR_COMPLET', 'modele-test', 4000) as id`, [DOC_TDR])
+  assert.equal((await q(`select kind from ai_requests where id=$1`, [id]))[0].kind, 'REDIGER_TDR_COMPLET')
+  await rejects(as('cpm', `select claim_ai_request($1, 'AUTRE_TYPE', 'modele-test', 10)`, [DOC_TDR]), /check|kind/i)
+})

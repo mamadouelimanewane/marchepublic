@@ -6,7 +6,7 @@
 //  • guides par section : consignes, points de contrôle, exemple et erreurs fréquentes.
 // ==========================================
 
-export interface DocSection { id: string; titre: string; contenu: string; obligatoire?: boolean; consigne?: string }
+export interface DocSection { id: string; titre: string; contenu: string; obligatoire?: boolean; consigne?: string; guide?: Omit<SectionGuide, 'titre'> }
 export interface ClauseRef { code: string; titre: string; obligatoire: boolean; natures?: string[] | null }
 
 /** Variables disponibles dans les modèles : `{{cle}}`. */

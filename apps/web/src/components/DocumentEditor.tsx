@@ -4,11 +4,12 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  blockingIssues, guideFor, lintDocument, mergeVariables, qualityScore, unknownVariables,
+  PLACEHOLDER_RE, blockingIssues, guideFor, lintDocument, mergeVariables, qualityScore, unknownVariables,
   type ClauseRef, type DocSection, type Issue, type VariableValues,
 } from '@marchepublic/workflow'
 import { saveDocument } from '@/app/dashboard/actions/passation'
-import { draftSection, reviewDocument } from '@/app/dashboard/actions/assistant'
+import { draftSection, draftTdrBatch, reviewDocument } from '@/app/dashboard/actions/assistant'
+import { MAX_SECTIONS_PAR_LOT } from '@/lib/ai-prompts'
 
 export type Section = DocSection
 export interface ClauseOption extends ClauseRef { contenu: string }
@@ -20,7 +21,7 @@ const LABEL = { BLOQUANT: 'Bloquant', AVERTISSEMENT: 'À corriger', CONSEIL: 'Co
 /** Éditeur de sections d'un TDR / DAO : guide par section, variables de fusion, clauses types, contrôle qualité en direct
  *  et assistant IA (proposition de rédaction et relecture). Chaque enregistrement crée une version immuable ; les problèmes
  *  « bloquants » empêchent la validation par le PRM (règle appliquée en base). L'IA ne propose que : rien n'est enregistré sans l'agent. */
-export function DocumentEditor({ documentId, type, nature, ligneBudgetaire, initial, clauses, variables, readOnly, ai }: {
+export function DocumentEditor({ documentId, type, nature, ligneBudgetaire, initial, clauses, variables, readOnly, ai, questions = [] }: {
   documentId: string
   type: 'TDR' | 'DAO'
   nature: string
@@ -31,6 +32,8 @@ export function DocumentEditor({ documentId, type, nature, ligneBudgetaire, init
   readOnly: boolean
   /** Assistant IA : activé si une clé est configurée côté serveur ; `remaining` = requêtes restantes sur 24 h. */
   ai?: { enabled: boolean; remaining: number | null }
+  /** Questions de cadrage propres au métier (modèle de TDR), posées avant la rédaction complète par l'IA. */
+  questions?: string[]
 }) {
   const router = useRouter()
   const [sections, setSections] = useState<Section[]>(initial)
@@ -42,6 +45,39 @@ export function DocumentEditor({ documentId, type, nature, ligneBudgetaire, init
   const [avis, setAvis] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState<string | null>(null)
   const aiOn = Boolean(ai?.enabled) && !readOnly
+
+  // Rédaction complète d'un TDR par l'IA : cadrage → lots de sections → aperçu → application au choix.
+  const [cadrage, setCadrage] = useState<string[]>([])
+  const [cadrageNotes, setCadrageNotes] = useState('')
+  const [progress, setProgress] = useState<string | null>(null)
+  const [fullDraft, setFullDraft] = useState<{ id: string; titre: string; texte: string }[] | null>(null)
+  const [picked, setPicked] = useState<Record<string, boolean>>({})
+  const cibles = sections.filter(s => !s.id.startsWith('clause-') && (!s.contenu.trim() || PLACEHOLDER_RE.test(s.titre + s.contenu)))
+  const generateFull = async () => {
+    const lots: typeof cibles[] = []
+    for (let i = 0; i < cibles.length; i += MAX_SECTIONS_PAR_LOT) lots.push(cibles.slice(i, i + MAX_SECTIONS_PAR_LOT))
+    const done: { id: string; titre: string; texte: string }[] = []
+    setFullDraft(null)
+    for (let n = 0; n < lots.length; n++) {
+      setProgress(`Rédaction du lot ${n + 1} sur ${lots.length}…`)
+      const res = await draftTdrBatch(documentId, {
+        sections: lots[n].map(s => ({ id: s.id, titre: s.titre, consigne: s.consigne, points: s.guide?.points, contenuActuel: s.contenu })),
+        cadrage: questions.map((q, i) => ({ question: q, reponse: cadrage[i] ?? '' })), notes: cadrageNotes,
+      })
+      if (!res.ok || !res.data) { toast.error(res.message); break }
+      for (const x of res.data.sections) done.push({ id: x.id, titre: sections.find(s => s.id === x.id)?.titre ?? x.id, texte: x.contenu })
+    }
+    setProgress(null)
+    if (done.length) { setFullDraft(done); setPicked(Object.fromEntries(done.map(d => [d.id, true]))); toast.success(`${done.length} section(s) rédigée(s) : relisez-les avant de les appliquer.`) }
+  }
+  const applyFull = () => {
+    if (!fullDraft) return
+    const chosen = new Map(fullDraft.filter(d => picked[d.id]).map(d => [d.id, d.texte]))
+    setSections(s => s.map(x => (chosen.has(x.id) ? { ...x, contenu: chosen.get(x.id)! } : x)))
+    setDirty(true)
+    setFullDraft(null)
+    toast.info(`${chosen.size} section(s) appliquée(s) : complétez les [●] puis enregistrez.`)
+  }
 
   const issues = useMemo(() => lintDocument(sections, { type, nature, clauses, ligneBudgetaire }), [sections, type, nature, clauses, ligneBudgetaire])
   const score = qualityScore(issues)
@@ -122,8 +158,44 @@ export function DocumentEditor({ documentId, type, nature, ligneBudgetaire, init
         )}
       </div>
 
+      {aiOn && type === 'TDR' && (
+        <details className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-950" open={Boolean(fullDraft) || progress !== null}>
+          <summary className="cursor-pointer font-semibold">Rédiger le TDR complet avec l&apos;IA ({cibles.length} section(s) à rédiger)</summary>
+          <div className="mt-3 space-y-3">
+            <p className="text-xs">Répondez aux questions de cadrage (même brièvement) : plus vos réponses sont précises, plus le texte l&apos;est. L&apos;IA rédige les sections vides ou encore à compléter, par lots ; vous relisez, choisissez ce que vous gardez, puis enregistrez. Les valeurs qu&apos;elle ne connaît pas restent marquées [●].</p>
+            {questions.map((q, i) => (
+              <label key={q} className="block text-xs font-medium">{q}
+                <textarea rows={2} maxLength={1000} value={cadrage[i] ?? ''} onChange={e => setCadrage(c => { const n = [...c]; n[i] = e.target.value; return n })} className={`${area} mt-1 text-xs`} />
+              </label>
+            ))}
+            <label className="block text-xs font-medium">Autres précisions (contraintes, particularités)
+              <textarea rows={2} maxLength={2000} value={cadrageNotes} onChange={e => setCadrageNotes(e.target.value)} className={`${area} mt-1 text-xs`} />
+            </label>
+            <button type="button" disabled={aiBusy !== null || progress !== null || cibles.length === 0} onClick={generateFull}
+              className="rounded bg-purple-700 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-800 disabled:opacity-50">
+              {progress ?? (cibles.length === 0 ? 'Aucune section à rédiger' : 'Générer le TDR complet')}
+            </button>
+            {fullDraft && (
+              <div className="space-y-2 rounded bg-white p-3 text-gray-900">
+                <p className="text-xs font-medium text-purple-950">Propositions de l&apos;IA, à relire : elles peuvent se tromper et ne remplacent pas votre expertise.</p>
+                {fullDraft.map(d => (
+                  <div key={d.id} className="rounded border border-gray-200 p-2">
+                    <label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={picked[d.id] ?? false} onChange={e => setPicked(p => ({ ...p, [d.id]: e.target.checked }))} />{d.titre}</label>
+                    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap font-sans text-xs">{d.texte}</pre>
+                  </div>
+                ))}
+                <div className="flex gap-2">
+                  <button type="button" onClick={applyFull} className="rounded border border-purple-700 px-3 py-1 text-xs font-semibold hover:bg-purple-50">Appliquer la sélection</button>
+                  <button type="button" onClick={() => setFullDraft(null)} className="rounded border border-gray-400 px-3 py-1 text-xs hover:bg-gray-50">Tout rejeter</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
       {sections.map((s, i) => {
-        const g = guideFor(s.id)
+        const g =s.guide ?? guideFor(s.id)   // le guide du modèle (propre au métier) prime sur le guide générique
         const mine = bySection(s.id)
         const stillVars = unknownVariables(s.contenu + s.titre)
         return (

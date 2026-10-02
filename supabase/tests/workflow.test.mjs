@@ -402,7 +402,7 @@ describe('Données de référence et reporting', () => {
     const [{ tdr }] = await q(`select count(*)::int tdr from document_templates where type='TDR'`)
     const [{ dao }] = await q(`select count(*)::int dao from document_templates where type='DAO'`)
     const [{ ev }] = await q(`select count(*)::int ev from evaluation_templates`)
-    assert.equal(tdr, 12); assert.equal(dao, 6); assert.equal(ev, 12)
+    assert.equal(tdr, 47); assert.equal(dao, 6); assert.equal(ev, 43)   // 43 corps de métiers (un modèle et une grille chacun) + 4 modèles génériques de TDR
     const [{ cl }] = await q(`select count(*)::int cl from clause_templates where obligatoire`)
     assert.ok(cl >= 8)
   })
