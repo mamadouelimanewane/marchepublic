@@ -186,7 +186,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 |---|---|---|
 | Plateforme déployée (back-office, portail public) | 🟡 | En ligne en projet d'essai, sans parcours utilisateur éprouvé |
 | Spécifications fonctionnelles détaillées, maquettes | ⛔ | Seules l'architecture et la matrice de conformité existent |
-| Manuels utilisateurs par profil, plan de formation | ⛔ | |
+| Manuels utilisateurs par profil, plan de formation | 🟡 | Rédigés (`docs/manuels/` : 11 manuels, plan de formation, parcours de recette) d'après le code ; **captures d'écran à ajouter** après la première recette utilisateur, formation à dispenser |
 | Recette : un marché complet de bout en bout par mode de passation | 🟡 | Parcours complet testé en base pour un marché ouvert, plus l'infructueux et l'allotissement ; pas un cas par mode |
 | Recette : étanchéité avant ouverture | ✅ | Test automatique ; **pas de test d'intrusion externe** |
 | Recette : seuils et quotas | ✅ | |
@@ -200,8 +200,8 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 | État | Nombre |
 |---|---|
 | ✅ Conforme | 47 |
-| 🟡 Partiel ou non éprouvé | 10 |
-| ⛔ Non réalisé | 11 |
+| 🟡 Partiel ou non éprouvé | 11 |
+| ⛔ Non réalisé | 10 |
 
 ### Les écarts qui comptent le plus, par ordre de priorité
 1. **Souveraineté des données** (⛔) : hébergement aux États-Unis. Décision d'hébergement à prendre avant toute donnée réelle.
@@ -210,7 +210,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 4. **Validation juridique des paramètres** (🟡) : délais, seuils, archivage, publication des moyennes de prestataires.
 5. **Test d'intrusion et test de charge** (⛔) : exigés par les critères de recette.
 6. **Interconnexions** (⛔/🟡) : SIGFIP, ADIE, portail national, DGID, mobile money — chacune exige un accès ou une spécification que seules ces institutions fournissent.
-7. **Documentation et formation** (⛔) : spécifications détaillées, manuels, plan de formation.
+7. **Documentation et formation** (🟡) : manuels et plan de formation rédigés, à illustrer et valider en recette ; spécifications fonctionnelles détaillées et maquettes restent à produire.
 8. **Écarts de périmètre réalisables sans tiers** : procédure propre aux DSP/PPP.
 9. **Application mobile native (Capacitor)** : la PWA couvre l'essentiel du besoin ; la version native reste à décider.
 

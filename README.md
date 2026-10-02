@@ -2,6 +2,8 @@
 
 Dématérialisation de la commande publique sénégalaise, de la programmation budgétaire à l'archivage, conformément au
 **Décret n°2022-2295** et au cahier des charges (`docs/` — matrice de conformité : [docs/architecture/matrice-conformite-cdc.md](docs/architecture/matrice-conformite-cdc.md)).
+**Manuels utilisateurs par profil**, plan de formation et parcours de recette : [docs/manuels/](docs/manuels/README.md). Comparaison détaillée avec le cahier des charges : [docs/architecture/comparaison-cdc.md](docs/architecture/comparaison-cdc.md).
+
 
 ## Architecture
 
