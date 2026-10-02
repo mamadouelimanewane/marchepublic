@@ -81,7 +81,10 @@ export default async function ProgrammationPage({ searchParams }: { searchParams
       <Card title={`Plan de passation des marchés ${year}`} subtitle={`${ppm.data?.length ?? 0} marché(s) — ${fcfa(total)}`} padded={false}
         actions={<div className="flex items-center gap-3 text-sm">
           <form><select name="annee" defaultValue={year} className="rounded-lg border border-gray-300 px-2 py-1">{[year - 1, year, year + 1].map(y => <option key={y} value={y}>{y}</option>)}</select> <button className="rounded border px-2 py-1">Afficher</button></form>
-          <a className="font-medium text-green-700 hover:underline" href={`/api/ppm/export?annee=${year}`}>Exporter (Excel/CSV)</a>
+          <span className="flex items-center gap-2">Exporter :
+            <a className="font-medium text-green-700 hover:underline" href={`/api/ppm/export?annee=${year}&format=xlsx`}>Excel</a>
+            <a className="font-medium text-green-700 hover:underline" href={`/api/ppm/export?annee=${year}&format=pdf`} target="_blank" rel="noreferrer">PDF</a>
+            <a className="font-medium text-green-700 hover:underline" href={`/api/ppm/export?annee=${year}&format=csv`}>CSV</a></span>
         </div>}>
         <DataTable rows={ppm.data} rowKey={t => t.id} empty="Aucun marché programmé cette année."
           columns={[

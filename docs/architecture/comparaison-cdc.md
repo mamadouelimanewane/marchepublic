@@ -20,7 +20,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 ### A2. Programmation (phase 1)
 - Expression de besoin par le service demandeur, validation/rejet motivé par le PRM, inscription au PPM.
 - Référence séquentielle `MP-CODE-AAAA-NNNN`.
-- Plan de passation annuel, export CSV, alerte de retard par rapport au calendrier prévisionnel.
+- Plan de passation annuel, export Excel, PDF et CSV, alerte de retard par rapport au calendrier prévisionnel.
 
 ### A3. Rédaction des TDR / DAO (phase 2)
 - Bibliothèque : 43 modèles de TDR sectoriels (un par corps de métier) et 4 modèles génériques, modèles de DAO par mode de passation, 12 clauses types, grilles d'évaluation types par corps de métier.
@@ -124,7 +124,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 ### §6 Modules fonctionnels
 | Module | État | Écart éventuel |
 |---|---|---|
-| Programmation et PPM | 🟡 | Export en **CSV** ; le cahier demande PDF/Excel |
+| Programmation et PPM | ✅ | Export du plan en Excel (.xlsx), PDF et CSV |
 | Rédaction | ✅ | Édition collaborative **asynchrone** (circuit + commentaires), pas d'édition simultanée en temps réel |
 | Publication et gestion des AO | 🟡 | Pas de publication multicanal (portail national, affichage) |
 | Dépôt et ouverture | ✅ | Offres retirées et tardives gérées |

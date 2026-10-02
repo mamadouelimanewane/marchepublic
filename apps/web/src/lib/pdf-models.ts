@@ -94,3 +94,35 @@ export function contratModel(t: TenderInfo, c: { montant_initial: number; date_d
     ],
   }
 }
+
+// ------------------------------------------
+// Plan de passation des marchés (PPM)
+// ------------------------------------------
+export interface PpmRow { reference: string | null; title: string; nature_marche: string; mode_passation: string | null; montant_estime: number | null; ppm_trimestre: number | null; current_phase: string; institution?: string }
+
+const label = (v: string | null | undefined) => (v ?? '—').replaceAll('_', ' ').toLowerCase()
+
+export function ppmModel(annee: number, institution: string | null, rows: PpmRow[]): PdfModel {
+  const total = rows.reduce((n, r) => n + Number(r.montant_estime ?? 0), 0)
+  const trimestres = [1, 2, 3, 4].map(t => {
+    const r = rows.filter(x => x.ppm_trimestre === t)
+    return [`T${t}`, String(r.length), fcfa(r.reduce((n, x) => n + Number(x.montant_estime ?? 0), 0))]
+  })
+  const sans = rows.filter(x => !x.ppm_trimestre)
+  if (sans.length) trimestres.push(['Non planifié', String(sans.length), fcfa(sans.reduce((n, x) => n + Number(x.montant_estime ?? 0), 0))])
+  const multi = new Set(rows.map(r => r.institution ?? '')).size > 1
+  const sorted = [...rows].sort((a, b) => (a.ppm_trimestre ?? 9) - (b.ppm_trimestre ?? 9) || (a.reference ?? '').localeCompare(b.reference ?? ''))
+  return {
+    title: `Plan de passation des marchés ${annee}`, subtitle: institution ?? (multi ? 'Plusieurs autorités contractantes' : undefined), reference: `PPM-${annee}`,
+    blocks: [
+      { t: 'kv', rows: [['Exercice', String(annee)], ['Nombre de marchés', String(rows.length)], ['Montant total estimé', fcfa(total)]] },
+      { t: 'h2', text: 'Répartition par trimestre' },
+      { t: 'table', head: ['Trimestre', 'Marchés', 'Montant estimé'], widths: [2, 1, 3], rows: trimestres },
+      { t: 'h2', text: 'Liste des marchés programmés' },
+      { t: 'table', head: multi ? ['T', 'Référence', 'Objet', 'Autorité', 'Mode', 'Montant estimé'] : ['T', 'Référence', 'Objet', 'Nature', 'Mode', 'Montant estimé'],
+        widths: [0.5, 3.1, 3.6, 2.2, 1.1, 2.2],
+        rows: sorted.map(r => [r.ppm_trimestre ? `T${r.ppm_trimestre}` : '—', r.reference ?? '—', r.title, multi ? (r.institution ?? '—') : label(r.nature_marche), r.mode_passation ?? '—', fcfa(r.montant_estime)]) },
+      { t: 'p', text: 'Document généré par la plateforme à partir des marchés inscrits au plan ; les montants sont des estimations hors engagement.' },
+    ],
+  }
+}
