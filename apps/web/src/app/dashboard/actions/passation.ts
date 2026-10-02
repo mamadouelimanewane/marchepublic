@@ -242,7 +242,7 @@ export async function prononcerAttribution(fd: FormData): Promise<ActionResult> 
 export async function submitAppeal(fd: FormData): Promise<ActionResult> {
   return guarded(async () => {
     const v = parse(appealSchema, fd)
-    await rpc('submit_appeal', { p_tender: v.tender_id, p_motif: v.motif, p_description: v.description ?? null, p_document_path: null })
+    await rpc('submit_appeal', { p_tender: v.tender_id, p_motif: v.motif, p_description: v.description ?? null, p_document_path: null, p_lot: v.lot_id ?? null })
     refresh()
     return ok('Recours déposé. La procédure est suspendue jusqu\'à la décision de l\'ARCOP.')
   })

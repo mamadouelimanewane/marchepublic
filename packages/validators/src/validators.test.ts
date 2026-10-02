@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  amendmentSchema, appealDecisionSchema, bidSubmissionSchema, criteresSchema, formatZodError, registerSchema, sectionsSchema, reviewSchema, tenderSchema,
+  amendmentSchema, appealDecisionSchema, appealSchema, bidSubmissionSchema, criteresSchema, formatZodError, registerSchema, sectionsSchema, reviewSchema, tenderSchema,
 } from './index'
 
 const uuid = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
@@ -58,5 +58,17 @@ describe('sectionsSchema : sections de modèle sectoriel', () => {
   it('refuse un guide incomplet ou démesuré', () => {
     expect(sectionsSchema.safeParse([{ id: 'a', titre: 'T', contenu: '', guide: { objectif: 'x' } }]).success).toBe(false)
     expect(sectionsSchema.safeParse([{ id: 'a', titre: 'T', contenu: '', guide: { ...guide, points: Array.from({ length: 31 }, () => 'p') } }]).success).toBe(false)
+  })
+})
+
+describe('appealSchema : périmètre du recours', () => {
+  const base = { tender_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301', motif: 'Notation contestée par le candidat' }
+  it('sans lot, ou « ALL », ou vide : marché entier', () => {
+    for (const lot of [undefined, '', 'ALL']) expect(appealSchema.parse({ ...base, lot_id: lot }).lot_id).toBeUndefined()
+  })
+  it('un lot précis est conservé ; une valeur quelconque est refusée', () => {
+    const lot = '4f2504e0-4f89-41d3-9a0c-0305e82c3302'
+    expect(appealSchema.parse({ ...base, lot_id: lot }).lot_id).toBe(lot)
+    expect(appealSchema.safeParse({ ...base, lot_id: 'lot 2' }).success).toBe(false)
   })
 })

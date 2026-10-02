@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { missingPreconditions } from '@marchepublic/workflow'
 import { requireSession } from '@/lib/auth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { latestPerLot } from '@/lib/rankings'
 import { loadFacts } from '@/lib/tender-facts'
 import { TENDER_COLUMNS, type TenderRow } from '@/lib/types'
 import { dateFr, fcfa } from '@/lib/format'
@@ -24,11 +25,12 @@ export default async function AttributionTenderPage({ params }: { params: Promis
   const facts = await loadFacts(supabase, t)
 
   const [rankings, bids, reviews, lots] = await Promise.all([
-    supabase.from('bid_rankings').select('bid_id, lot_id, rang, qualifie, score_technique, score_financier, score_global, montant_offre').eq('tender_id', id).eq('round', t.evaluation_round).order('rang', { nullsFirst: false }),
+    supabase.from('bid_rankings').select('bid_id, lot_id, round, rang, qualifie, score_technique, score_financier, score_global, montant_offre').eq('tender_id', id).order('rang', { nullsFirst: false }),
     supabase.from('bids').select('id, status, users:soumissionnaire_id(full_name, is_pme, is_pme_feminine)').eq('tender_id', id),
     supabase.from('dcmp_reviews').select('type, decision, created_at, motivation').eq('tender_id', id).eq('type', 'APPROBATION_ATTRIBUTION').order('created_at', { ascending: false }),
     supabase.from('tender_lots').select('id, numero_lot, libelle, statut, attributaire_bid_id, montant_attribue').eq('tender_id', id).order('numero_lot'),
   ])
+  const ranked = latestPerLot(rankings.data ?? [])
   const lotLabel = (lotId: string | null) => { const l = (lots.data ?? []).find(x => x.id === lotId); return l ? `Lot ${l.numero_lot}` : '—' }
   const name = (bidId: string) => (bids.data as any[] | null)?.find(b => b.id === bidId)?.users?.full_name ?? '—'
   const isBidderRole = session.role === 'SOUMISSIONNAIRE'
@@ -47,8 +49,8 @@ export default async function AttributionTenderPage({ params }: { params: Promis
       {t.has_appeal_pending && <Alert tone="red" title="🔒 Recours pendant">L'attribution définitive et la signature du contrat sont bloquées par la base tant que l'ARCOP n'a pas statué.</Alert>}
 
       <Card title="Classement des offres" padded={false}
-        actions={<span className="flex gap-3">{(rankings.data ?? []).length > 0 && !isBidderRole && <a href={`/api/pdf/rapport-evaluation/${id}`} target="_blank" rel="noreferrer" className="text-sm font-medium text-green-700 hover:underline">Rapport d'évaluation (PDF)</a>}{t.date_fin_recours && <a href={`/api/pdf/decision-attribution/${id}`} target="_blank" rel="noreferrer" className="text-sm font-medium text-green-700 hover:underline">Décision d'attribution (PDF)</a>}</span>}>
-        <DataTable rows={rankings.data} rowKey={r => r.bid_id} empty="Le classement n'est pas encore disponible."
+        actions={<span className="flex gap-3">{ranked.length > 0 && !isBidderRole && <a href={`/api/pdf/rapport-evaluation/${id}`} target="_blank" rel="noreferrer" className="text-sm font-medium text-green-700 hover:underline">Rapport d'évaluation (PDF)</a>}{t.date_fin_recours && <a href={`/api/pdf/decision-attribution/${id}`} target="_blank" rel="noreferrer" className="text-sm font-medium text-green-700 hover:underline">Décision d'attribution (PDF)</a>}</span>}>
+        <DataTable rows={ranked} rowKey={r => r.bid_id} empty="Le classement n'est pas encore disponible."
           columns={[
             ...(t.is_alloti ? [{ header: 'Lot', cell: (r: { lot_id: string | null }) => lotLabel(r.lot_id) }] : []),
             { header: 'Rang', cell: r => r.qualifie ? <strong>{r.rang}</strong> : <Badge tone="red">Éliminée</Badge> },
@@ -63,18 +65,18 @@ export default async function AttributionTenderPage({ params }: { params: Promis
           <ActionForm action={prononcerAttribution} submitLabel="Prononcer l'attribution provisoire" confirm="Prononcer l'attribution ? Tous les candidats seront notifiés et le délai de recours s'ouvrira.">
             <input type="hidden" name="tender_id" value={id} />
             {t.is_alloti ? (lots.data ?? []).filter(l => l.statut === 'OUVERT').map(l => {
-              const ranked = (rankings.data ?? []).filter(r => r.lot_id === l.id && r.qualifie)
-              return ranked.length ? (
+              const lotRanked = ranked.filter(r => r.lot_id === l.id && r.qualifie)
+              return lotRanked.length ? (
                 <div key={l.id} className="rounded-lg border border-gray-200 p-3">
                   <p className="mb-2 text-sm font-semibold">Lot {l.numero_lot} — {l.libelle}</p>
-                  <Field label="Offre retenue" name={`bid_${l.id}`} required defaultValue={ranked.find(r => r.rang === 1)?.bid_id}
-                    options={ranked.map(r => ({ value: r.bid_id, label: `Rang ${r.rang} — ${name(r.bid_id)} — ${fcfa(r.montant_offre)}` }))} />
+                  <Field label="Offre retenue" name={`bid_${l.id}`} required defaultValue={lotRanked.find(r => r.rang === 1)?.bid_id}
+                    options={lotRanked.map(r => ({ value: r.bid_id, label: `Rang ${r.rang} — ${name(r.bid_id)} — ${fcfa(r.montant_offre)}` }))} />
                   <Field label="Justification (si l'offre retenue n'est pas la mieux classée)" name={`justification_${l.id}`} rows={2} />
                 </div>
               ) : <p key={l.id} className="text-sm text-amber-800">Lot {l.numero_lot} : aucune offre qualifiée, déclaré infructueux.</p>
             }) : <>
-            <Field label="Offre retenue" name="bid_id" required defaultValue={rankings.data?.find(r => r.rang === 1)?.bid_id}
-              options={(rankings.data ?? []).filter(r => r.qualifie).map(r => ({ value: r.bid_id, label: `Rang ${r.rang} — ${name(r.bid_id)} — ${fcfa(r.montant_offre)}` }))} />
+            <Field label="Offre retenue" name="bid_id" required defaultValue={ranked.find(r => r.rang === 1)?.bid_id}
+              options={ranked.filter(r => r.qualifie).map(r => ({ value: r.bid_id, label: `Rang ${r.rang} — ${name(r.bid_id)} — ${fcfa(r.montant_offre)}` }))} />
             <Field label="Justification (obligatoire si l'offre retenue n'est pas la mieux classée)" name="justification" rows={2} />
             </>}
           </ActionForm>

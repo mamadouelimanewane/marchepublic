@@ -178,6 +178,8 @@ export const appealSchema = z.object({
   tender_id: uuid('Marché'),
   motif: texte('Motif du recours', 10, 300),
   description: optionalText(10_000),
+  /** Lot contesté ; « ALL » ou vide = marché entier. */
+  lot_id: z.union([z.literal('ALL'), z.literal(''), uuid('Lot')]).optional().transform(v => (!v || v === 'ALL' ? undefined : v)),
 })
 export const appealDecisionSchema = z.object({
   appeal_id: uuid('Recours'),

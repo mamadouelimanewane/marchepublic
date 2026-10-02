@@ -17,7 +17,7 @@ export default async function RecoursPage() {
 
   const [appeals, open] = await Promise.all([
     supabase.from('appeals')
-      .select('id, motif, description, status, date_depot, date_limite_instruction, date_decision, decision_arcop, tender_id, tenders(reference, title, current_phase, montant_attribue), users:requerant_id(full_name, ninea)')
+      .select('id, motif, description, status, date_depot, date_limite_instruction, date_decision, decision_arcop, tender_id, lot_id, tender_lots(numero_lot, libelle), tenders(reference, title, current_phase, montant_attribue), users:requerant_id(full_name, ninea)')
       .order('date_depot', { ascending: false }),
     session.role === 'SOUMISSIONNAIRE'
       ? supabase.from('bids').select('tender_id, status, tenders(id, reference, title, current_phase, date_fin_recours)').not('status', 'in', '(RETARDEE,RETIREE,BROUILLON,PROVISOIREMENT_RETENUE)')
@@ -38,7 +38,7 @@ export default async function RecoursPage() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-bold text-green-800"><Link href={`/dashboard/marches/${a.tender_id}`} className="hover:underline">{a.tenders?.reference}</Link> — {a.tenders?.title}</p>
-                  <p className="text-xs text-gray-500">Requérant : {a.users?.full_name ?? '—'} · déposé le {dateFr(a.date_depot, true)} · instruction avant le {dateFr(a.date_limite_instruction, true)}</p>
+                  <p className="text-xs text-gray-500">Périmètre : {a.tender_lots ? `lot ${a.tender_lots.numero_lot} — ${a.tender_lots.libelle}` : 'marché entier'} · Requérant : {a.users?.full_name ?? '—'} · déposé le {dateFr(a.date_depot, true)} · instruction avant le {dateFr(a.date_limite_instruction, true)}</p>
                 </div>
                 <Badge tone={TONE[a.status as keyof typeof TONE]}>{a.status}</Badge>
               </div>
@@ -52,7 +52,8 @@ export default async function RecoursPage() {
                     <Field label="Décision" name="decision" required options={[
                       ...(a.status === 'DEPOSE' ? [{ value: 'EN_INSTRUCTION', label: 'Mettre en instruction' }] : []),
                       { value: 'IRRECEVABLE', label: 'Irrecevable' }, { value: 'REJETE', label: 'Rejeté' },
-                      { value: 'FAVORABLE', label: 'Favorable (reprise de l\'évaluation)' }, { value: 'PARTIELLEMENT_FAVORABLE', label: 'Partiellement favorable (reprise)' }]} />
+                      { value: 'FAVORABLE', label: a.lot_id ? 'Favorable (réévaluation de ce lot seulement)' : 'Favorable (reprise de l\'évaluation)' },
+                      { value: 'PARTIELLEMENT_FAVORABLE', label: a.lot_id ? 'Partiellement favorable (réévaluation de ce lot)' : 'Partiellement favorable (reprise)' }]} />
                     <Field className="md:col-span-2" label="Motivation (20 caractères min. sauf mise en instruction)" name="motivation" rows={2} />
                   </div>
                 </ActionForm>

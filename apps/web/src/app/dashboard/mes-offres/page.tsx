@@ -12,7 +12,7 @@ export default async function MesOffresPage() {
   const supabase = await createSupabaseServerClient()
   const { data } = await supabase.from('bids')
     .select('id, status, submitted_at, montant_offre, lots:lot_id(numero_lot), tenders(id, reference, title, current_phase, has_appeal_pending, date_fin_recours)').order('submitted_at', { ascending: false })
-  const { data: rankings } = await supabase.from('bid_rankings').select('bid_id, rang, score_global, qualifie')
+  const { data: rankings } = await supabase.from('bid_rankings').select('bid_id, round, rang, score_global, qualifie').order('round')
   const rk = new Map((rankings ?? []).map(r => [r.bid_id, r]))
 
   return (

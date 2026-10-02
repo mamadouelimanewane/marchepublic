@@ -56,7 +56,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 
 ### A9. Attribution et recours (phases 9–11)
 - Attribution provisoire (justification si l'offre n'est pas la mieux classée), notification de tous les candidats.
-- Recours par un candidat recevable dans le délai, décompte du délai légal, instruction et décision motivée de l'ARCOP.
+- Recours par un candidat recevable dans le délai, **par lot ou sur le marché entier** (une décision favorable sur un lot ne rouvre que ce lot), décompte du délai légal, instruction et décision motivée de l'ARCOP.
 - **Verrou dur** : aucun passage en phase 11 ni signature de contrat tant qu'un recours est pendant, même par écriture directe en base.
 - Attribution définitive après purge des recours, approbation, vérification des quotas PME.
 
@@ -211,7 +211,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 5. **Test d'intrusion et test de charge** (⛔) : exigés par les critères de recette.
 6. **Interconnexions** (⛔/🟡) : SIGFIP, ADIE, portail national, DGID, mobile money — chacune exige un accès ou une spécification que seules ces institutions fournissent.
 7. **Documentation et formation** (⛔) : spécifications détaillées, manuels, plan de formation.
-8. **Écarts de périmètre réalisables sans tiers** : export PPM en PDF et Excel natif, procédure propre aux DSP/PPP, distinction ouverture publique/restreinte, recours par lot.
+8. **Écarts de périmètre réalisables sans tiers** : procédure propre aux DSP/PPP, distinction ouverture publique/restreinte.
 9. **Application mobile native (Capacitor)** : la PWA couvre l'essentiel du besoin ; la version native reste à décider.
 
 ### Ce que l'application fait en plus du cahier des charges

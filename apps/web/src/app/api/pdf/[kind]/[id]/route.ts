@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseAdminClient, createSupabaseServerClient } from '@/lib/supabase/server'
 import { renderPdf, type PdfModel } from '@/lib/pdf'
+import { latestPerLot } from '@/lib/rankings'
 import {
   contratModel, decisionAttributionModel, documentModel, pvOuvertureModel, pvReceptionModel, rapportEvaluationModel,
 } from '@/lib/pdf-models'
@@ -53,14 +54,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ kin
     const { data: t } = await supabase.from('tenders').select(tenderCols).eq('id', id).maybeSingle()
     if (!t) return notFound()
     const [{ data: rk }, { data: bids }, { data: cfg }] = await Promise.all([
-      supabase.from('bid_rankings').select('bid_id, rang, qualifie, score_technique, score_financier, score_global, montant_offre').eq('tender_id', id).eq('round', t.evaluation_round).order('lot_id').order('rang', { nullsFirst: false }),
+      supabase.from('bid_rankings').select('bid_id, lot_id, round, rang, qualifie, score_technique, score_financier, score_global, montant_offre').eq('tender_id', id).order('lot_id').order('rang', { nullsFirst: false }),
       supabase.from('bids').select('id, lots:lot_id(numero_lot), users:soumissionnaire_id(full_name)').eq('tender_id', id),
       supabase.from('config_seuils').select('valeur').eq('cle', 'EVAL_SEUIL_TECHNIQUE').maybeSingle(),
     ])
-    if (!rk?.length) return notFound()
+    const ranked = latestPerLot(rk ?? [])   // après un recours sur un lot : dernière ronde de chaque lot
+    if (!ranked.length) return notFound()
     const by = new Map((bids ?? []).map((b: Row) => [b.id, b]))
     model = rapportEvaluationModel({ ...tenderInfo(t), evaluation_round: t.evaluation_round }, t.criteres_evaluation ?? [],
-      rk.map((r: Row) => ({ lot: by.get(r.bid_id)?.lots ? `Lot ${by.get(r.bid_id)?.lots?.numero_lot}` : null, rang: r.rang, candidat: by.get(r.bid_id)?.users?.full_name ?? 'Candidat', technique: r.score_technique, financier: r.score_financier, global: r.score_global, montant: r.montant_offre, qualifie: r.qualifie })),
+      ranked.map((r: Row) => ({ lot: by.get(r.bid_id)?.lots ? `Lot ${by.get(r.bid_id)?.lots?.numero_lot}` : null, rang: r.rang, candidat: by.get(r.bid_id)?.users?.full_name ?? 'Candidat', technique: r.score_technique, financier: r.score_financier, global: r.score_global, montant: r.montant_offre, qualifie: r.qualifie })),
       Number(cfg?.valeur ?? 70))
   } else if (kind === 'decision-attribution') {
     const { data: t } = await supabase.from('tenders').select(`${tenderCols}, is_alloti, attributaire_id, current_phase`).eq('id', id).maybeSingle()

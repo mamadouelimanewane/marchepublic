@@ -89,7 +89,9 @@ REMOTE_DB_URL="postgres://postgres.<ref>:<mot-de-passe>@<hote>:5432/postgres" np
 | Procédure infructueuse | ✅ | Déclaration motivée par le PRM (phase 8), refusée si une offre qualifiée est classée ; clôture sans contrat ; relance en nouveau marché (`relancer_marche`), historique intact | `workflow.test.mjs` |
 | Allotissement systématique (CDC §2.2) | ✅ | Dépôt par lot (lot obligatoire sur marché alloti) ; classement, attribution et contrat **par lot** ; lot sans offre qualifiée déclaré infructueux sans bloquer les autres ; quotas PME par lot ; recours sur le marché entier ; plafonds d'avenants/sous-traitance par contrat | `lots.test.mjs` |
 
-Limites de l'allotissement : un recours suspend l'ensemble du marché (pas de recours par lot) ; pas d'attribution cumulée des lots (rabais pour plusieurs lots) ; un lot infructueux ne se relance pas individuellement.
+Recours par lot (migration `0022`) : un recours vise un lot ou le marché entier ; une décision favorable sur un lot ne rouvre que ce lot (nouvelle ronde, les autres lots gardent attribution et classement) ; un lot rouvert devenu infructueux laisse le marché poursuivre avec les autres lots ; une décision favorable n'est admise qu'en phase 10. Test : `recours-lots.test.mjs`.
+
+Limites de l'allotissement : le marché reste en phase 10 tant qu'un recours est pendant (une seule phase par marché : les lots non contestés ne passent pas en attribution définitive avant la décision) ; pas d'attribution cumulée des lots (rabais pour plusieurs lots) ; un lot infructueux ne se relance pas individuellement.
 
 | Exigence | État | Mise en œuvre | Test |
 |---|---|---|---|
