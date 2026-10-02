@@ -16,6 +16,8 @@ Ces manuels répondent au livrable « manuels utilisateurs par profil » du cahi
 | [Cour des Comptes](10-cour-des-comptes.md) | Contrôle a posteriori | Consultation, Journal d'audit |
 | [Administrateur](11-administrateur.md) | Administrateur de la plateforme | Paramétrage & comptes |
 
+**Version Word, prête à diffuser** : [Manuels-utilisateurs.docx](Manuels-utilisateurs.docx) (regénérée par `node scripts/build-manuels-docx.mjs`).
+
 Documents complémentaires : [Plan de formation](12-plan-de-formation.md) et [Parcours de recette](13-parcours-de-recette.md) (déroulé d'un marché complet avec les comptes de démonstration).
 
 ## À lire avant tout
