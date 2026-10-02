@@ -190,7 +190,7 @@ Site : https://marchepublic-eight.vercel.app — état au dépôt `main`, migrat
 | Recette : un marché complet de bout en bout par mode de passation | 🟡 | Parcours complet testé en base pour un marché ouvert, plus l'infructueux et l'allotissement ; pas un cas par mode |
 | Recette : étanchéité avant ouverture | ✅ | Test automatique ; **pas de test d'intrusion externe** |
 | Recette : seuils et quotas | ✅ | |
-| Recette : test de charge | ⛔ | |
+| Recette : test de charge | ⛔ | Seul un test léger des pages publiques a été fait (`scripts/load-public.mjs` : 300 requêtes, 0 échec, médiane ≈ 300 ms, p95 ≤ 1,7 s). Le test exigé, celui de la clôture de dépôt (dépôts authentifiés simultanés), reste à faire sur un environnement dédié |
 
 ---
 
